@@ -1,11 +1,19 @@
-import { Body, Controller, Post, Res, Req, Get } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Post,
+    Res,
+    Req,
+    Get,
+    UnauthorizedException,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { User } from './decorators/user.decorator';
-import { NatsService } from '../nats/nats.service';
+import { MsAuthClient } from '../ms-auth-client/ms-auth-client.service';
+import { AccessToken } from './decorators/access-token.decorator';
 import { Public } from './decorators/public.decorator';
 import {
-    AUTH_SUBJECTS,
     CurrentUserData,
     LoginRequestDto,
     LoginRequestSchema,
@@ -18,13 +26,13 @@ import { ZodValidationPipe } from '../utils/zod-validation.pipe';
 @Controller('ms/auth')
 export class AuthController {
     constructor(
-        private readonly natsService: NatsService,
+        private readonly msAuthClient: MsAuthClient,
         private readonly authService: AuthService,
     ) {}
 
     @Get('users')
-    async getUsers() {
-        return this.natsService.send('users.getAll', {});
+    async getUsers(@AccessToken() accessToken: string) {
+        return this.msAuthClient.getUsers(accessToken);
     }
 
     @Get('me')
@@ -37,7 +45,8 @@ export class AuthController {
     async signup(
         @Body(ZodValidationPipe(SignupRequestSchema)) dto: SignupRequestDto,
     ): Promise<{ success: true }> {
-        return this.natsService.send(AUTH_SUBJECTS.SIGNUP, dto);
+        await this.msAuthClient.signup(dto);
+        return { success: true };
     }
 
     @Public()
@@ -46,10 +55,7 @@ export class AuthController {
         @Body() body: { code: string },
         @Res({ passthrough: true }) response: Response,
     ): Promise<Omit<LoginResponseDto, 'refreshToken'>> {
-        const result = await this.natsService.send<
-            LoginResponseDto,
-            { code: string }
-        >(AUTH_SUBJECTS.AUTH_GOOGLE, body);
+        const result = await this.msAuthClient.google(body.code);
 
         this.authService.insertIntoCookies(
             'refresh_token',
@@ -68,10 +74,7 @@ export class AuthController {
         @Body(ZodValidationPipe(LoginRequestSchema)) dto: LoginRequestDto,
         @Res({ passthrough: true }) response: Response,
     ): Promise<Omit<LoginResponseDto, 'refreshToken'>> {
-        const result = await this.natsService.send<
-            LoginResponseDto,
-            LoginRequestDto
-        >(AUTH_SUBJECTS.SIGNIN, dto);
+        const result = await this.msAuthClient.login(dto);
 
         this.authService.insertIntoCookies(
             'refresh_token',
@@ -93,12 +96,13 @@ export class AuthController {
         const cookies: Record<string, string> = request.cookies;
         const refreshToken = cookies.refresh_token;
 
-        const result = await this.natsService.send<
-            LoginResponseDto,
-            { refreshToken: string }
-        >(AUTH_SUBJECTS.REFRESH_TOKEN, {
-            refreshToken,
-        });
+        // Sans cookie, ms-auth-java répondrait 400 (body invalide) : le Front attend un 401
+        // pour renvoyer vers la connexion.
+        if (!refreshToken) {
+            throw new UnauthorizedException();
+        }
+
+        const result = await this.msAuthClient.refresh(refreshToken);
 
         this.authService.insertIntoCookies(
             'refresh_token',
@@ -113,12 +117,15 @@ export class AuthController {
 
     @Post('signout')
     async signout(
-        @User() user: CurrentUserData,
+        @AccessToken() accessToken: string,
+        @Req() request: Request,
         @Res({ passthrough: true }) response: Response,
     ) {
-        const result = await this.natsService.send(AUTH_SUBJECTS.SIGNOUT, {
-            userId: user.id,
-        });
+        const cookies: Record<string, string> = request.cookies;
+        // Sans cookie, il n'y a aucune session à révoquer côté ms-auth : on nettoie juste.
+        if (cookies.refresh_token) {
+            await this.msAuthClient.logout(accessToken, cookies.refresh_token);
+        }
 
         response.clearCookie('refresh_token', {
             httpOnly: true,
@@ -127,6 +134,6 @@ export class AuthController {
             path: '/',
         });
 
-        return result;
+        return { success: true };
     }
 }

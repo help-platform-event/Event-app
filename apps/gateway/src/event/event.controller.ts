@@ -15,6 +15,7 @@ import { UpdateEventDto } from './dto/update-event.dto';
 import { EventFiltersDto } from './dto/event-filters.dto';
 import { PublicUser, User } from '../ms-auth/decorators/user.decorator';
 import { Public } from '../ms-auth/decorators/public.decorator';
+import { AccessToken } from '../ms-auth/decorators/access-token.decorator';
 import { EventDto, EventWithAddress, PaginatedEventsDto } from '@app/contracts';
 
 @Controller('events')
@@ -25,8 +26,9 @@ export class EventController {
     async create(
         @Body() createEventDTO: CreateEventDto,
         @User('id') userId: string,
+        @AccessToken() accessToken: string,
     ): Promise<EventWithAddress> {
-        return this.eventService.create(createEventDTO, userId);
+        return this.eventService.create(createEventDTO, userId, accessToken);
     }
 
     @Public()
@@ -38,8 +40,11 @@ export class EventController {
     }
 
     @Get('my-events')
-    async findMyAll(@User('id') userId: string): Promise<EventWithAddress[]> {
-        return await this.eventService.findAllMyEvents(userId);
+    async findMyAll(
+        @User('id') userId: string,
+        @AccessToken() accessToken: string,
+    ): Promise<EventWithAddress[]> {
+        return await this.eventService.findAllMyEvents(userId, accessToken);
     }
 
     @Public()
@@ -60,8 +65,14 @@ export class EventController {
         @Param('id') id: string,
         @Body() updateEventDto: UpdateEventDto,
         @User('id') userId: string,
+        @AccessToken() accessToken: string,
     ): Promise<EventWithAddress> {
-        return this.eventService.update(+id, updateEventDto, userId);
+        return this.eventService.update(
+            +id,
+            updateEventDto,
+            userId,
+            accessToken,
+        );
     }
 
     @Patch(':id/cancel')

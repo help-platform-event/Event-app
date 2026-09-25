@@ -13,13 +13,8 @@ import { CreateAddressDto } from '../address/dto/create-address.dto';
 import { toGeocodeDto } from '../address/mapper/address.mapper';
 import { Coordinates } from '../geoapify/type/geoapify.type';
 import { Prisma, prisma } from '@app/db';
-import {
-    EventDto,
-    EventWithAddress,
-    PaginatedEventsDto,
-    USER_SUBJECTS,
-} from '@app/contracts';
-import { NatsService } from '../nats/nats.service';
+import { EventDto, EventWithAddress, PaginatedEventsDto } from '@app/contracts';
+import { MsAuthClient } from '../ms-auth-client/ms-auth-client.service';
 import { eventDetailsQuery } from './query/event-details.query';
 import { eventWithAddressQuery } from './query/event-address.query';
 
@@ -27,14 +22,15 @@ import { eventWithAddressQuery } from './query/event-address.query';
 export class EventService {
     constructor(
         private readonly geoapifyService: GeoapifyService,
-        private readonly natsService: NatsService,
+        private readonly msAuthClient: MsAuthClient,
     ) {}
 
     async create(
         createEventDto: CreateEventDto,
         userId: string,
+        accessToken: string,
     ): Promise<EventWithAddress> {
-        await this.natsService.send(USER_SUBJECTS.GET_USER, { userId });
+        await this.msAuthClient.getUser(accessToken, userId);
 
         const hasConflict = await this.hasEventConflict(
             userId,
@@ -333,8 +329,11 @@ export class EventService {
         };
     }
 
-    async findAllMyEvents(userId: string): Promise<EventWithAddress[]> {
-        await this.natsService.send(USER_SUBJECTS.GET_USER, { userId });
+    async findAllMyEvents(
+        userId: string,
+        accessToken: string,
+    ): Promise<EventWithAddress[]> {
+        await this.msAuthClient.getUser(accessToken, userId);
 
         const events = await prisma.event.findMany({
             where: { organizer_id: userId },
@@ -379,11 +378,10 @@ export class EventService {
         id: number,
         updateEventDto: UpdateEventDto,
         userId: string,
+        accessToken: string,
     ): Promise<EventWithAddress> {
         const existingEvent = await this.findOwnedEventOrFail(id, userId);
-        await this.natsService.send(USER_SUBJECTS.GET_USER, {
-            userId,
-        });
+        await this.msAuthClient.getUser(accessToken, userId);
 
         const { address, ...eventData } = updateEventDto;
         const nextStartDate = eventData.start_date

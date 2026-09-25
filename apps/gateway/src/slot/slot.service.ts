@@ -8,23 +8,15 @@ import { CreateSlotDto } from './dto/create-slot.dto';
 import { UpdateSlotDto } from './dto/update-slot.dto';
 import { SlotMapper } from './dto/mapper/slot.mapper';
 import { prisma } from '@app/db';
-import { NatsService } from '../nats/nats.service';
-import { SlotDetails, SlotDto, USER_SUBJECTS } from '@app/contracts';
+import { MsAuthClient } from '../ms-auth-client/ms-auth-client.service';
+import { SlotDetails, SlotDto } from '@app/contracts';
 import { slotWithParticipationStatusQuery } from './query/SlotWithParticipationStatus.query';
 
 type OwnerShipEntity = 'Mission' | 'Slot';
 
-export interface UserProfileResponse {
-    id: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-    avatar_url: string;
-}
-
 @Injectable()
 export class SlotService {
-    constructor(private readonly nastService: NatsService) {}
+    constructor(private readonly msAuthClient: MsAuthClient) {}
     async create(
         userId: string,
         missionId: number,
@@ -114,6 +106,7 @@ export class SlotService {
     async findOneWithParticipants(
         userId: string,
         slotId: number,
+        accessToken: string,
     ): Promise<SlotDetails> {
         const [slot, currentParticipants] = await Promise.all([
             prisma.slot.findUnique({
@@ -131,10 +124,10 @@ export class SlotService {
 
         const userIds = [...new Set(slot.Participation.map((p) => p.user_id))];
 
-        const participantsProfiles = await this.nastService.send<
-            UserProfileResponse[],
-            { userIds: string[] }
-        >(USER_SUBJECTS.GET_PROFILES, { userIds });
+        const participantsProfiles = await this.msAuthClient.getProfiles(
+            accessToken,
+            userIds,
+        );
 
         const profilesMap = new Map(
             participantsProfiles.map((profile) => [profile.id, profile]),

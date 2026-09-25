@@ -4,7 +4,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './guard/auth.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { NatsModule } from '../nats/nats.module';
 
 @Module({
     controllers: [AuthController],
@@ -16,7 +15,6 @@ import { NatsModule } from '../nats/nats.module';
         },
     ],
     imports: [
-        NatsModule,
         JwtModule.register({
             global: true,
         }),
