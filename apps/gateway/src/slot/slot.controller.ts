@@ -13,6 +13,7 @@ import { SlotService } from './slot.service';
 import { CreateSlotDto } from './dto/create-slot.dto';
 import { UpdateSlotDto } from './dto/update-slot.dto';
 import { User } from '../ms-auth/decorators/user.decorator';
+import { AccessToken } from '../ms-auth/decorators/access-token.decorator';
 import { SlotDetails, SlotDto } from '@app/contracts';
 
 @Controller()
@@ -33,9 +34,14 @@ export class SlotController {
         @User('id') userId: string,
         @Param('id', ParseIntPipe) slodId: number,
         @Query('details') details: boolean,
+        @AccessToken() accessToken: string,
     ): Promise<SlotDetails | SlotDto> {
         if (details)
-            return this.slotService.findOneWithParticipants(userId, slodId);
+            return this.slotService.findOneWithParticipants(
+                userId,
+                slodId,
+                accessToken,
+            );
         return this.slotService.findOneById(userId, slodId);
     }
 

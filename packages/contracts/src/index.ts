@@ -1,6 +1,3 @@
-// NATS
-export * from "./nats/nats.contract.js";
-
 // AUTH
 export * from "./auth/auth.contracts.js";
 
@@ -8,9 +5,7 @@ export * from "./auth/auth.contracts.js";
 export * from "./settings/profile.contract.js";
 export * from "./settings/availability.contract.js";
 export * from "./settings/notification.contract.js";
-export * from "./settings/preferences.contract.js";
 export * from "./settings/me-settings.contract.js";
-export * from "./settings/security.contract.js";
 
 // TYPES
 export * from "./types/slot/slot.types.js";

@@ -1,59 +1,11 @@
+# Full dev stack in one command (requires ms-auth-java cloned next to this repo):
+#   docker compose -f docker-compose.dev.yml --profile app up --build
+# `--profile app` is needed because ms-auth-java keeps its own `app` service behind that profile.
+include:
+    # ms-auth-java's MySQL (3307), Kafka (9094), Adminer (8081) and the app itself (8080).
+    - ../ms-auth-java/compose.yaml
+
 services:
-    # -------------------------
-    # EVENT BUS
-    # -------------------------
-    nats:
-        image: nats:latest
-        container_name: dev-nats-alt
-        ports:
-            - "4222:4222"
-
-    # -------------------------
-    # AUTH DB
-    # -------------------------
-    mongo-auth:
-        image: mongo:latest
-        container_name: dev-mongo-auth
-        ports:
-            - "27017:27017"
-        volumes:
-            - mongo_auth_data:/data/db
-
-    mongo-express-auth:
-        image: mongo-express:latest
-        container_name: dev-mongo-express-auth
-        restart: always
-        ports:
-            - "8084:8081"
-        environment:
-            ME_CONFIG_MONGODB_URL: mongodb://mongo-auth:27017
-            ME_CONFIG_BASICAUTH: "false"
-        depends_on:
-            - mongo-auth
-
-    # -------------------------
-    # USER DB
-    # -------------------------
-    mongo-user:
-        image: mongo:latest
-        container_name: dev-mongo-user
-        ports:
-            - "27018:27017"
-        volumes:
-            - mongo_user_data:/data/db
-
-    mongo-express-user:
-        image: mongo-express:latest
-        container_name: dev-mongo-express-user
-        restart: always
-        ports:
-            - "8082:8081"
-        environment:
-            ME_CONFIG_MONGODB_URL: mongodb://mongo-user:27017
-            ME_CONFIG_BASICAUTH: "false"
-        depends_on:
-            - mongo-user
-
     # -------------------------
     # DB PRISMA (MYSQL)
     # -------------------------
@@ -68,6 +20,13 @@ services:
             MYSQL_DATABASE: help
         ports:
             - "3308:3306"
+        healthcheck:
+            # TCP (-h 127.0.0.1), not the socket: on first start MySQL runs a temporary init
+            # server without networking, which a socket ping would wrongly report as ready.
+            test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
 
     phpmyadmin:
         image: phpmyadmin
@@ -79,6 +38,21 @@ services:
             PMA_HOST: db
         depends_on:
             - db
+
+    # One-shot: applies the Prisma migrations, then exits. Reuses the Gateway image's `builder`
+    # stage, which has the full workspace (Prisma CLI + migrations) installed.
+    db-migrate:
+        build:
+            context: .
+            dockerfile: apps/gateway/Dockerfile
+            target: builder
+        environment:
+            DATABASE_URL: mysql://root:root@db:3306/help
+        command: ["pnpm", "--filter", "@app/db", "db:deploy"]
+        depends_on:
+            db:
+                condition: service_healthy
+        restart: "no"
 
     # =========================================================
     # MICROSERVICES
@@ -96,27 +70,24 @@ services:
             - "3000:3000"
         env_file:
             - .env
+        environment:
+            # Pinned here rather than read from .env, whose later entries can point at a remote DB.
+            DATABASE_HOST: db
+            DATABASE_PORT: 3306
+            DATABASE_USER: root
+            DATABASE_PASSWORD: root
+            DATABASE_NAME: help
+            # `app` = ms-auth-java, from the included compose file (same network).
+            MS_AUTH_URL: http://app:8080
+            # Must match ms-auth-java's dev JWT_SECRET (see its compose.yaml): the Gateway
+            # verifies the access tokens that ms-auth-java signs.
+            JWT_ACCESS_SECRET: c2FtcGxlLWRldi1vbmx5LXNlY3JldC1kby1ub3QtdXNlLWluLXByb2QtMzJieXRlcyE=
+            JWTALGORITHM: HS256
         depends_on:
-            - db
-            - nats
-            - ms-auth
-        restart: unless-stopped
-
-    # -------------------------
-    # MS-AUTH
-    # -------------------------
-    ms-auth:
-        build:
-            context: .
-            dockerfile: services/ms-auth/Dockerfile
-        container_name: dev-ms-auth
-        ports:
-            - "3001:3001"
-        env_file:
-            - .env
-        depends_on:
-            - mongo-auth
-            - nats
+            db-migrate:
+                condition: service_completed_successfully
+            app:
+                condition: service_healthy
         restart: unless-stopped
 
     # -------------------------
@@ -126,11 +97,14 @@ services:
         build:
             context: .
             dockerfile: apps/front/Dockerfile
+            # Vite inlines these at build time (ARGs in the Dockerfile), not at runtime.
+            args:
+                VITE_API_URL: http://localhost:3000
+                VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+                VITE_GEOAPIFY_API_KEY: ${VITE_GEOAPIFY_API_KEY:-}
         container_name: dev-frontend
         ports:
             - "5173:80"
-        environment:
-            VITE_API_URL: http://localhost:3000
         depends_on:
             - gateway
         restart: unless-stopped
@@ -139,6 +113,4 @@ services:
 # VOLUMES
 # -------------------------
 volumes:
-    mongo_auth_data:
-    mongo_user_data:
     db_data:

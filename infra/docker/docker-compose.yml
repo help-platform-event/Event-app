@@ -1,59 +1,8 @@
+# Infra-only dev stack, for running the Gateway/Front on the host (`pnpm dev`).
+# Auth (ms-auth-java + its MySQL/Kafka) runs from the ms-auth-java repo
+# (`./mvnw spring-boot:run` or `docker compose --profile app up`).
+# For the full containerised stack in one command, use ../../docker-compose.dev.yml instead.
 services:
-    # -------------------------
-    # EVENT BUS
-    # -------------------------
-    nats:
-        image: nats:latest
-        container_name: nats-alt
-        ports:
-            - "4222:4222"
-
-    # -------------------------
-    # AUTH DB
-    # -------------------------
-    mongo-auth:
-        image: mongo:latest
-        container_name: mongo-auth
-        ports:
-            - "27017:27017"
-        volumes:
-            - mongo_auth_data:/data/db
-
-    mongo-express-auth:
-        image: mongo-express:latest
-        container_name: mongo-express-auth
-        restart: always
-        ports:
-            - "8084:8081"
-        environment:
-            ME_CONFIG_MONGODB_SERVER: mongo-auth
-            ME_CONFIG_BASICAUTH: false
-        depends_on:
-            - mongo-auth
-
-    # -------------------------
-    # USER DB
-    # -------------------------
-    mongo-user:
-        image: mongo:latest
-        container_name: mongo-user
-        ports:
-            - "27018:27017"
-        volumes:
-            - mongo_user_data:/data/db
-
-    mongo-express-user:
-        image: mongo-express:latest
-        container_name: mongo-express-user
-        restart: always
-        ports:
-            - "8082:8081"
-        environment:
-            ME_CONFIG_MONGODB_SERVER: mongo-user
-            ME_CONFIG_BASICAUTH: false
-        depends_on:
-            - mongo-user
-
     # -------------------------
     # DB PRISMA
     # -------------------------
@@ -79,6 +28,4 @@ services:
             PMA_HOST: db
 
 volumes:
-    mongo_auth_data:
-    mongo_user_data:
     db_data:

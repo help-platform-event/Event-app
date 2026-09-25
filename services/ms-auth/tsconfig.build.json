@@ -1,9 +1,0 @@
-{
-    "extends": "./tsconfig.json",
-    "compilerOptions": {
-        // "paths": {
-        //     "@app/contracts": ["packages/contracts/src/index.ts"]
-        // }
-    },
-    "exclude": ["node_modules", "dist", "test"]
-}

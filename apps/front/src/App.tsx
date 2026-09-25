@@ -19,7 +19,6 @@ import { SlotDetailsPage } from './pages/Slot/SlotDetailsPage';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { useEffect } from 'react';
 import AvailabilitySetting from './features/settings/components/AvailabilitySetting';
-import PreferencesSetting from './features/settings/components/PreferencesSetting';
 import ProfilSetting from './features/settings/components/ProfilSetting';
 import SecuritySettings from './features/settings/components/SecuritySetting';
 import NotificationsSetting from './features/settings/components/NotificationsSetting';
@@ -69,6 +68,7 @@ function App() {
                                 <RoleBasedLayout
                                     layouts={{
                                         USER: PrivateLayout,
+                                        ADMIN: PrivateLayout,
                                     }}
                                     fallback={VisitorLayout}
                                 />
@@ -79,7 +79,7 @@ function App() {
                         </Route>
 
                         {/* PRIVATE - ONLY USER */}
-                        <Route element={<PrivateRoute allowedRoles={['USER']} />}>
+                        <Route element={<PrivateRoute allowedRoles={['USER', 'ADMIN']} />}>
                             <Route element={<PrivateLayout />}>
                                 <Route path="/me/events" element={<Event />} />
                                 <Route path="/events/create" element={<EventCreationPage />} />
@@ -100,7 +100,6 @@ function App() {
                                         path="notifications"
                                         element={<NotificationsSetting />}
                                     />
-                                    <Route path="preferences" element={<PreferencesSetting />} />
                                 </Route>
                             </Route>
                         </Route>

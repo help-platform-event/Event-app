@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { Algorithm } from 'jsonwebtoken';
 import { JwtPayload } from '../type/auth.type';
+import { extractTokenFromHeader } from '../decorators/access-token.decorator';
 // import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
@@ -76,13 +77,18 @@ export class AuthGuard implements CanActivate {
         }
 
         try {
+            // Les access tokens sont émis par ms-auth-java (jjwt), qui décode son secret en
+            // Base64 : on doit vérifier avec les mêmes octets, pas avec la chaîne brute.
             const payload = await this.jwtService.verifyAsync<JwtPayload>(
                 token,
                 {
                     algorithms: [
-                        (process.env.JWTALGORITHM as Algorithm) ?? 'HS512',
+                        (process.env.JWTALGORITHM as Algorithm) ?? 'HS256',
                     ],
-                    secret: process.env.JWT_ACCESS_SECRET,
+                    secret: Buffer.from(
+                        process.env.JWT_ACCESS_SECRET ?? '',
+                        'base64',
+                    ),
                 },
             );
 
@@ -100,7 +106,6 @@ export class AuthGuard implements CanActivate {
     }
 
     private extractTokenFromHeader(request: Request): string | undefined {
-        const [type, token] = request.headers.authorization?.split(' ') ?? [];
-        return type === 'Bearer' ? token : undefined;
+        return extractTokenFromHeader(request);
     }
 }

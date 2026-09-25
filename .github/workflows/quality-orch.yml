@@ -12,7 +12,6 @@ jobs:
 
     outputs:
       gateway: ${{ steps.filter.outputs.gateway }}
-      auth: ${{ steps.filter.outputs.auth }}
       front: ${{ steps.filter.outputs.front }}
 
     steps:
@@ -24,10 +23,6 @@ jobs:
           filters: |
             gateway:
               - 'apps/gateway/**'
-              - 'packages/contracts/**'
-
-            auth:
-              - 'services/ms-auth/**'
               - 'packages/contracts/**'
 
             front:
@@ -48,20 +43,6 @@ jobs:
       prisma-generate: true
       sonar-source: apps/gateway
       sonar-project-key: ${{ vars.SONAR_GATEWAY_PROJECT_KEY }}
-
-  auth-quality:
-    needs: detect-changes
-
-    if: needs.detect-changes.outputs.auth == 'true'
-
-    uses: ./.github/workflows/quality.yml
-
-    secrets: inherit
-
-    with:
-      package: ms-auth
-      sonar-source: services/ms-auth
-      sonar-project-key: ${{ vars.SONAR_MS_AUTH_PROJECT_KEY }}
 
   front-quality:
     needs: detect-changes

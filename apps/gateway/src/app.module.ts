@@ -9,7 +9,7 @@ import { SlotModule } from './slot/slot.module';
 import { MissionModule } from './mission/mission.module';
 import { ParticipationModule } from './participation/participation.module';
 import { GeoapifyModule } from './geoapify/geoapify.module';
-import { NatsModule } from './nats/nats.module';
+import { MsAuthClientModule } from './ms-auth-client/ms-auth-client.module';
 import { AuthController } from './ms-auth/auth.controller';
 import { HealthController } from './health.controller';
 import { HealthModule } from './health.module';
@@ -17,7 +17,7 @@ import { SettingsModule } from './settings/settings.module';
 
 @Module({
     imports: [
-        NatsModule,
+        MsAuthClientModule,
         ConfigModule.forRoot({ isGlobal: true }),
         EventModule,
         MissionModule,

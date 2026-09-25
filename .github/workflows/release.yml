@@ -1,14 +1,14 @@
+# AWS V1 staging pipeline — FROZEN.
+# Auth moved to ms-auth-java (separate repo), which this staging never received, so the automatic
+# deploy on push to develop is disabled. Manual runs only; replaced by the new deployment (roadmap
+# step 17).
 name: Release
 
 on:
-  push:
-    branches:
-      - develop
-
   workflow_dispatch:
     inputs:
       service:
-        description: "Service à deploy (gateway | auth | front | all)"
+        description: "Service à deploy (gateway | front | all) — staging AWS V1 gelé"
         required: true
         default: "all"
 
@@ -26,7 +26,6 @@ jobs:
 
     outputs:
       gateway: ${{ steps.filter.outputs.gateway }}
-      auth: ${{ steps.filter.outputs.auth }}
       front: ${{ steps.filter.outputs.front }}
 
     steps:
@@ -41,10 +40,6 @@ jobs:
               - 'apps/gateway/**'
               - 'packages/contracts/**'
               - 'packages/database/**'
-
-            auth:
-              - 'services/ms-auth/**'
-              - 'packages/contracts/**'
 
             front:
               - 'apps/front/**'
@@ -72,24 +67,6 @@ jobs:
       image-name: gateway
       file: apps/gateway/Dockerfile
 
-  build-auth:
-    needs: detect-changes
-
-    if: |
-      needs.detect-changes.outputs.auth == 'true' ||
-      (github.event_name == 'workflow_dispatch' && (inputs.service == 'auth' || inputs.service == 'all'))
-
-    permissions:
-      contents: read
-      packages: write
-
-    uses: ./.github/workflows/docker-build.yml
-
-    with:
-      context: .
-      image-name: ms-auth
-      file: services/ms-auth/Dockerfile
-
   build-front:
     needs: detect-changes
 
@@ -116,7 +93,7 @@ jobs:
 ## BUILD GATE
 ##########################
   build-gate:
-    needs: [build-gateway, build-auth, build-front]
+    needs: [build-gateway, build-front]
     runs-on: ubuntu-latest
 
     if: always()
@@ -125,12 +102,10 @@ jobs:
       - name: Validate atomic build
         run: |
           echo "gateway=${{ needs.build-gateway.result }}"
-          echo "auth=${{ needs.build-auth.result }}"
           echo "front=${{ needs.build-front.result }}"
 
           for r in \
             "${{ needs.build-gateway.result }}" \
-            "${{ needs.build-auth.result }}" \
             "${{ needs.build-front.result }}"; do
 
             if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
@@ -172,31 +147,6 @@ jobs:
       image-name: gateway
       network: nginx-staging
 
-  deploy-auth:
-    needs: [detect-changes, build-gate]
-    if: |
-      always() &&
-      (
-        (
-          github.event_name == 'push' &&
-          needs.detect-changes.outputs.auth == 'true' &&
-          needs.build-gate.result == 'success'
-        )
-        ||
-        (
-          github.event_name == 'workflow_dispatch' &&
-          (inputs.service == 'auth' || inputs.service == 'all')
-        )
-      )
-    uses: ./.github/workflows/deploy.yml
-    secrets: inherit
-    with:
-      compose-directory: /opt/event-app/staging
-      compose-service: staging-ms-auth
-      environment: staging
-      image-name: ms-auth
-      network: nginx-staging
-
   deploy-front:
     needs: [detect-changes, build-gate]
     if: |
@@ -226,7 +176,7 @@ jobs:
 ## DEPLOY GATE
 ##########################
   deploy-gate:
-    needs: [deploy-gateway, deploy-auth, deploy-front]
+    needs: [deploy-gateway, deploy-front]
     runs-on: ubuntu-latest
 
     if: always()
@@ -239,12 +189,10 @@ jobs:
         id: check
         run: |
           echo "gateway=${{ needs.deploy-gateway.result }}"
-          echo "auth=${{ needs.deploy-auth.result }}"
           echo "front=${{ needs.deploy-front.result }}"
 
           for r in \
             "${{ needs.deploy-gateway.result }}" \
-            "${{ needs.deploy-auth.result }}" \
             "${{ needs.deploy-front.result }}"; do
 
             if [[ "$r" == "failure" ]]; then
@@ -279,24 +227,6 @@ jobs:
       environment: staging
       target-sha: ${{ needs.deploy-gateway.outputs.previous-sha }}
 
-  rollback-auth:
-    needs: [deploy-auth, deploy-gate]
-
-    if: |
-      always() &&
-      needs.deploy-gate.outputs.rollback-needed == 'true' &&
-      needs.deploy-auth.result != 'skipped'
-
-    uses: ./.github/workflows/rollback.yml
-
-    secrets: inherit
-
-    with:
-      compose-directory: /opt/event-app/staging
-      compose-service: staging-ms-auth
-      environment: staging
-      target-sha: ${{ needs.deploy-auth.outputs.previous-sha }}
-
   rollback-front:
     needs: [deploy-front, deploy-gate]
 
@@ -319,7 +249,7 @@ jobs:
 ## ROLLBACK GATE (vérifie que les rollbacks ont bien fonctionné)
 ##########################
   rollback-gate:
-    needs: [rollback-gateway, rollback-auth, rollback-front]
+    needs: [rollback-gateway, rollback-front]
     runs-on: ubuntu-latest
 
     if: always() && needs.deploy-gate.outputs.rollback-needed == 'true'
@@ -328,14 +258,12 @@ jobs:
       - name: Check rollback results
         run: |
           echo "rollback-gateway=${{ needs.rollback-gateway.result }}"
-          echo "rollback-auth=${{ needs.rollback-auth.result }}"
           echo "rollback-front=${{ needs.rollback-front.result }}"
 
           FAILED=false
 
           for r in \
             "${{ needs.rollback-gateway.result }}" \
-            "${{ needs.rollback-auth.result }}" \
             "${{ needs.rollback-front.result }}"; do
 
             if [[ "$r" == "failure" ]]; then

@@ -7,7 +7,6 @@ const navOptions = [
     { id: 'disponibilites', label: 'Mes disponibilités', path: 'disponibilites' },
     { id: 'securite', label: 'Sécurité', path: 'securite' },
     { id: 'notifications', label: 'Notifications', path: 'notifications' },
-    { id: 'preferences', label: 'Préférences', path: 'preferences' },
 ];
 
 export function SettingsNav() {
