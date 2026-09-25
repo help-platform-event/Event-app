@@ -1,14 +1,5 @@
 services:
     # -------------------------
-    # EVENT BUS
-    # -------------------------
-    nats:
-        image: nats:latest
-        container_name: dev-nats-alt
-        ports:
-            - "4222:4222"
-
-    # -------------------------
     # AUTH DB
     # -------------------------
     mongo-auth:
@@ -96,27 +87,33 @@ services:
             - "3000:3000"
         env_file:
             - .env
+        environment:
+            # ms-auth-java runs from its own repo's compose (`docker compose --profile app up`),
+            # published on the host's port 8080.
+            MS_AUTH_URL: http://host.docker.internal:8080
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
         depends_on:
             - db
-            - nats
-            - ms-auth
         restart: unless-stopped
 
     # -------------------------
     # MS-AUTH
     # -------------------------
+    # Legacy NestJS ms-auth, replaced by ms-auth-java and no longer reachable (NATS is gone).
+    # Kept behind the `legacy` profile until its removal (roadmap step 15).
     ms-auth:
         build:
             context: .
             dockerfile: services/ms-auth/Dockerfile
         container_name: dev-ms-auth
+        profiles: ["legacy"]
         ports:
             - "3001:3001"
         env_file:
             - .env
         depends_on:
             - mongo-auth
-            - nats
         restart: unless-stopped
 
     # -------------------------
