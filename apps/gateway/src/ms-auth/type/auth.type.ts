@@ -2,7 +2,8 @@
  * Permet de gérer la structure du token
  */
 export interface JwtPayload {
-    sub: number;
+    /** UUID de l'utilisateur dans ms-auth-java. */
+    sub: string;
     email: string;
     role: string;
     iat?: number;
@@ -28,4 +29,4 @@ export interface CurrentUserData {
     role: Role;
 }
 
-export type Role = 'USER';
+export type Role = 'USER' | 'ADMIN';
