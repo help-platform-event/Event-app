@@ -13,3 +13,5 @@ coverage/
 .turbo/
 
 packages/database/src/generated
+.env*.bak
+
