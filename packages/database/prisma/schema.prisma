@@ -27,7 +27,6 @@ model Address {
     created_at      DateTime       @default(now()) @db.DateTime(0)
     updated_at      DateTime?      @updatedAt @db.DateTime(0)
     Event           Event[]
-    User_profile    User_profile[]
 
     @@unique([street_number, street_name, city, postal_code, country], name: "unique_address")
 }
@@ -44,18 +43,6 @@ model Announcement {
 
     @@index([author_id, event_id])
     @@index([event_id])
-}
-
-model Availability {
-    id         Int       @id @default(autoincrement())
-    user_id    String
-    start_at   DateTime  @db.DateTime(0)
-    end_at     DateTime  @db.DateTime(0)
-    created_at DateTime  @db.DateTime(0)
-    updated_at DateTime? @db.DateTime(0)
-
-    @@index([user_id, start_at, end_at])
-    @@index([user_id])
 }
 
 model Document {
@@ -203,49 +190,6 @@ model Recognition {
     @@index([event_id])
 }
 
-model User {
-    id                                   Int             @id @default(autoincrement())
-    email                                String          @unique() @db.VarChar(255)
-    password_hash                        String          @db.VarChar(150)
-    role                                 User_role
-    created_at                           DateTime        @default(now()) @db.DateTime(0)
-    updated_at                           DateTime?       @updatedAt @db.DateTime(0)
-}
-
-model Token {
-    id                  Int                   @id @default(autoincrement())
-    user_id             String
-    token               String                @db.VarChar(255)
-    is_revoked          Boolean?              @default(false)
-    revoked_by          Token_revokedby_enum? @default(USER)
-    type                Token_type_enum?      @default(REFRESH)
-    session_fingerprint String?               @db.VarChar(100)
-    // user_agent : voir pour faire un hash simple pour simplifier la ligne, pas forcement la chiffrer, md5 ?
-    revoked_at          DateTime?             @db.DateTime(0)
-    created_at          DateTime              @default(now()) @db.DateTime(0)
-    updated_at          DateTime?             @updatedAt @db.DateTime(0)
-
-
-    @@index([revoked_at])
-}
-
-model User_profile {
-    user_id      String       @id
-    first_name   String?   @db.VarChar(100)
-    last_name    String?   @db.VarChar(100)
-    phone_number String?   @db.VarChar(20)
-    birthdate    DateTime? @db.Date
-    address_id   Int?
-    bio          String?   @db.MediumText
-    avatar_url   String?   @db.VarChar(255)
-    created_at   DateTime  @default(now()) @db.DateTime(0)
-    updated_at   DateTime? @updatedAt @db.DateTime(0)
-    Address      Address?  @relation(fields: [address_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-    @@index([user_id])
-    @@index([address_id])
-}
-
 enum Participation_status {
     PENDING
     ACCEPTED
@@ -253,23 +197,8 @@ enum Participation_status {
     CANCELLED
 }
 
-enum Token_revokedby_enum {
-    USER
-    ADMIN
-    SYSTEM
-}
-
-enum Token_type_enum {
-    REFRESH
-}
-
 enum Recognition_type {
     BADGE
-}
-
-enum User_role {
-    USER
-    PLATFORM_ADMIN
 }
 
 enum Mission_status {
