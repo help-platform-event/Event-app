@@ -19,7 +19,7 @@ export function EventDetailsPage() {
 
     if (isError || !event) return <AlertColors />;
 
-    const isUser = user?.role === 'USER';
+    const isUser = user?.role === 'USER' || user?.role === 'ADMIN';
 
     return (
         <Tabs defaultValue="informations">

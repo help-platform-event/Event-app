@@ -36,7 +36,7 @@ export interface SectionProps
  * </Section>
  * <Section size="2">
  *   <h2>Sécurité</h2>
- *   <SecurityForm />
+ *   <ChangePasswordForm />
  * </Section>
  */
 export function Section({ size, className, ...props }: Readonly<SectionProps>) {
