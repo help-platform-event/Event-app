@@ -16,25 +16,26 @@ Monorepo (pnpm + Turborepo). Auth is served by [`ms-auth-java`](https://github.c
 | `ms-auth-java` (separate repo) | Auth, users, settings (JWT, refresh tokens, Google OAuth) | MySQL (JPA/Flyway) | 8080 |
 | `frontend` | React + TypeScript SPA | - | 5173 |
 
-The Gateway calls `ms-auth-java` over HTTP (`MS_AUTH_URL`) and verifies its access tokens locally (shared `JWT_ACCESS_SECRET`). Shared TypeScript/Zod contracts live in `packages/contracts`. The legacy NestJS `services/ms-auth` is kept behind the `legacy` compose profile until its removal.
+The Gateway calls `ms-auth-java` over HTTP (`MS_AUTH_URL`) and verifies its access tokens locally (shared `JWT_ACCESS_SECRET`). Shared TypeScript/Zod contracts live in `packages/contracts`.
 
-CI/CD: GitHub Actions, Docker images pushed to GHCR, atomic deploy on a single AWS EC2 instance.
+CI: GitHub Actions quality checks on pull requests. The AWS V1 release pipeline (`release.yml`, `infra/docker/docker-compose.{staging,prod}.yml`) is frozen: manual trigger only, kept as an archive until the new deployment.
 
-## Run locally with Docker
+## Run locally with Docker (full stack, one command)
 
-**Requirements:** Docker, Docker Compose.
+**Requirements:** Docker, Docker Compose, and [`ms-auth-java`](https://github.com/help-platform-event/ms-auth-java) cloned **next to** this repo (`../ms-auth-java`): `docker-compose.dev.yml` includes its `compose.yaml`.
+
+Create a `.env` at the repo root (see `apps/gateway/.env.example`; DB host/credentials, `MS_AUTH_URL` and the JWT settings are already set by the compose file). Add `VITE_GOOGLE_CLIENT_ID` and `VITE_GEOAPIFY_API_KEY` to that root `.env` too: they are passed to the Front as build args.
 
 ```bash
-git clone <repo-url>
-cd Event-app
+docker compose -f docker-compose.dev.yml --profile app up --build
 ```
 
-Start `ms-auth-java` first, from its own repo: `docker compose --profile app up --build` (API on http://localhost:8080).
+(`--profile app` starts the ms-auth-java container, which that repo keeps behind a profile.)
 
-Create a `.env` at the repo root (DB credentials, `MS_AUTH_URL`, `JWT_ACCESS_SECRET` = ms-auth-java's `JWT_SECRET` - see `apps/gateway/.env.example`), and a `.env` in `apps/front` (see `apps/front/.env.example`).
+On a fresh database, apply the Gateway migrations once the stack is up:
 
 ```bash
-docker compose up --build
+DATABASE_URL="mysql://root:root@localhost:3308/help" pnpm --filter @app/db db:deploy
 ```
 
 This starts:
@@ -43,20 +44,26 @@ This starts:
 |---|---|
 | Frontend | http://localhost:5173 |
 | Gateway API | http://localhost:3000 |
-| phpMyAdmin (MySQL gateway DB) | http://localhost:8083 |
-| Mongo Express (auth DB) | http://localhost:8084 |
+| ms-auth-java API | http://localhost:8080 |
+| phpMyAdmin (Gateway DB) | http://localhost:8083 |
+| Adminer (auth DB, server `mysql`) | http://localhost:8081 |
+| Kafka (host clients) | localhost:9094 |
 
 Stop everything:
 
 ```bash
-docker compose down
+docker compose -f docker-compose.dev.yml --profile app down
 ```
 
 Wipe volumes (reset DB state):
 
 ```bash
-docker compose down -v
+docker compose -f docker-compose.dev.yml --profile app down -v
 ```
+
+### Host mode (Gateway/Front with hot reload)
+
+`infra/docker/docker-compose.yml` starts only the Gateway's MySQL (3308) and phpMyAdmin. Run ms-auth-java from its repo (`./mvnw spring-boot:run`), then `pnpm dev` here, with `apps/gateway/.env` pointing at `localhost:3308` and `MS_AUTH_URL=http://localhost:8080`.
 
 ## Stack
 
@@ -66,4 +73,4 @@ docker compose down -v
 
 ## Status
 
-Active development. This repo (`event-app`) holds the stable NestJS/React stack currently deployed. Auth is being rewritten in Java/Spring Boot in a separate repo - see [`ms-auth-java`](https://github.com/help-platform-event/ms-auth-java).
+Active development. Auth has moved to Java/Spring Boot ([`ms-auth-java`](https://github.com/help-platform-event/ms-auth-java)); the staging instance still runs the frozen V1.
