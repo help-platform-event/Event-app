@@ -26,17 +26,17 @@ CI: GitHub Actions quality checks on pull requests. The AWS V1 release pipeline 
 
 Create a `.env` at the repo root (see `apps/gateway/.env.example`; DB host/credentials, `MS_AUTH_URL` and the JWT settings are already set by the compose file). Add `VITE_GOOGLE_CLIENT_ID` and `VITE_GEOAPIFY_API_KEY` to that root `.env` too: they are passed to the Front as build args.
 
-```bash
-docker compose -f docker-compose.dev.yml --profile app up --build
-```
-
-(`--profile app` starts the ms-auth-java container, which that repo keeps behind a profile.)
-
-On a fresh database, apply the Gateway migrations once the stack is up:
+From the root of this repo:
 
 ```bash
-DATABASE_URL="mysql://root:root@localhost:3308/help" pnpm --filter @app/db db:deploy
+pnpm stack:up      # build + start everything (detached); Gateway migrations are applied automatically
+pnpm stack:ps      # status
+pnpm stack:logs    # follow logs
+pnpm stack:down    # stop
+pnpm stack:reset   # stop and wipe volumes (fresh databases)
 ```
+
+These wrap `docker compose -f docker-compose.dev.yml --profile app ...` (`--profile app` starts the ms-auth-java container, which that repo keeps behind a profile). The one-shot `db-migrate` service runs `prisma migrate deploy` before the Gateway starts.
 
 This starts:
 
@@ -49,21 +49,9 @@ This starts:
 | Adminer (auth DB, server `mysql`) | http://localhost:8081 |
 | Kafka (host clients) | localhost:9094 |
 
-Stop everything:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile app down
-```
-
-Wipe volumes (reset DB state):
-
-```bash
-docker compose -f docker-compose.dev.yml --profile app down -v
-```
-
 ### Host mode (Gateway/Front with hot reload)
 
-`infra/docker/docker-compose.yml` starts only the Gateway's MySQL (3308) and phpMyAdmin. Run ms-auth-java from its repo (`./mvnw spring-boot:run`), then `pnpm dev` here, with `apps/gateway/.env` pointing at `localhost:3308` and `MS_AUTH_URL=http://localhost:8080`.
+`infra/docker/docker-compose.yml` starts only the Gateway's MySQL (3308) and phpMyAdmin. Run ms-auth-java from its repo (`./mvnw spring-boot:run`), then `pnpm dev` here, with `apps/gateway/.env` pointing at `localhost:3308` and `MS_AUTH_URL=http://localhost:8080`. Apply the Gateway migrations yourself in this mode: `DATABASE_URL="mysql://root:root@localhost:3308/help" pnpm --filter @app/db db:deploy`.
 
 ## Stack
 

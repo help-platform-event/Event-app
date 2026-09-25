@@ -20,6 +20,13 @@ services:
             MYSQL_DATABASE: help
         ports:
             - "3308:3306"
+        healthcheck:
+            # TCP (-h 127.0.0.1), not the socket: on first start MySQL runs a temporary init
+            # server without networking, which a socket ping would wrongly report as ready.
+            test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
 
     phpmyadmin:
         image: phpmyadmin
@@ -31,6 +38,21 @@ services:
             PMA_HOST: db
         depends_on:
             - db
+
+    # One-shot: applies the Prisma migrations, then exits. Reuses the Gateway image's `builder`
+    # stage, which has the full workspace (Prisma CLI + migrations) installed.
+    db-migrate:
+        build:
+            context: .
+            dockerfile: apps/gateway/Dockerfile
+            target: builder
+        environment:
+            DATABASE_URL: mysql://root:root@db:3306/help
+        command: ["pnpm", "--filter", "@app/db", "db:deploy"]
+        depends_on:
+            db:
+                condition: service_healthy
+        restart: "no"
 
     # =========================================================
     # MICROSERVICES
@@ -62,8 +84,8 @@ services:
             JWT_ACCESS_SECRET: c2FtcGxlLWRldi1vbmx5LXNlY3JldC1kby1ub3QtdXNlLWluLXByb2QtMzJieXRlcyE=
             JWTALGORITHM: HS256
         depends_on:
-            db:
-                condition: service_started
+            db-migrate:
+                condition: service_completed_successfully
             app:
                 condition: service_healthy
         restart: unless-stopped

@@ -5,7 +5,12 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "stack:up": "docker compose -f docker-compose.dev.yml --profile app up --build -d",
+    "stack:down": "docker compose -f docker-compose.dev.yml --profile app down",
+    "stack:reset": "docker compose -f docker-compose.dev.yml --profile app down -v",
+    "stack:logs": "docker compose -f docker-compose.dev.yml --profile app logs -f",
+    "stack:ps": "docker compose -f docker-compose.dev.yml --profile app ps"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
