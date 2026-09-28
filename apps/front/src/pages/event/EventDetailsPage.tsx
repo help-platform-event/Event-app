@@ -3,7 +3,7 @@ import { useGetEventById } from '../../features/event/hooks/use_event.service';
 import { EventDetailsCard } from '../../features/event/components/EventDetailsCard';
 import { EventDiscussion } from '../../features/event/components/EventDiscussion';
 import { EventDocuments } from '../../features/event/components/EventDocuments';
-import { useMe } from '../../features/auth/hooks/use_auth.service';
+import { useCanAccessEventMembersArea } from '../../features/event/hooks/use_event_access';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InfoIcon, DocumentsIcon, DiscussionIcon } from '../../shared/components/UI/icons/icons';
 import { AlertColors } from '@/components/alert-colors';
@@ -11,15 +11,15 @@ import { LoadingPage } from '@/components/loading-page';
 
 export function EventDetailsPage() {
     const { eventId } = useParams<{ eventId: string }>();
-    const { data: user } = useMe();
-
     const { data: event, isLoading, isError } = useGetEventById(Number(eventId));
+    // Called before the early returns (rules of hooks); a missing event simply has no access.
+    const canAccessMembersArea = useCanAccessEventMembersArea(
+        event ?? { id: Number(eventId), organizer_id: '' },
+    );
 
     if (isLoading) return <LoadingPage />;
 
     if (isError || !event) return <AlertColors />;
-
-    const isUser = user?.role === 'USER' || user?.role === 'ADMIN';
 
     return (
         <Tabs defaultValue="informations">
@@ -28,7 +28,7 @@ export function EventDetailsPage() {
                     <InfoIcon size={16} />
                     Informations
                 </TabsTrigger>
-                {isUser && (
+                {canAccessMembersArea && (
                     <>
                         <TabsTrigger value="documents">
                             <DocumentsIcon size={16} />
@@ -46,7 +46,7 @@ export function EventDetailsPage() {
                 <EventDetailsCard event={event} />
             </TabsContent>
 
-            {isUser && (
+            {canAccessMembersArea && (
                 <>
                     <TabsContent value="documents">
                         <EventDocuments />
