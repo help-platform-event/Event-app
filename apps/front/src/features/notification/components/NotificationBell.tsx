@@ -22,15 +22,21 @@ import {
 /** Header bell: unread badge (polled every 30 s) and the latest notifications in a menu. */
 export function NotificationBell() {
     const [open, setOpen] = useState(false);
-    const { data: unread } = useUnreadCount();
+    const { data: unread, refetch: refetchUnreadCount } = useUnreadCount();
     const { data: notifications, isLoading } = useNotifications(open);
     const markRead = useMarkRead();
     const markAllRead = useMarkAllRead();
 
     const count = unread?.count ?? 0;
 
+    // Opening the menu loads a fresh list: refresh the badge too, so both always agree.
+    const handleOpenChange = (next: boolean) => {
+        setOpen(next);
+        if (next) void refetchUnreadCount();
+    };
+
     return (
-        <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenu open={open} onOpenChange={handleOpenChange}>
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="ghost"

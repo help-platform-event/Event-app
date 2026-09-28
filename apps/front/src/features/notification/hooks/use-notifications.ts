@@ -8,7 +8,9 @@ const POLL_INTERVAL_MS = 30_000;
 
 /**
  * The bell's badge. Polling: React Query re-runs the request every 30 s, and pauses while the tab
- * is hidden (`refetchIntervalInBackground` is false by default).
+ * is hidden (`refetchIntervalInBackground` is false by default). Coming back to the tab refreshes
+ * it at once (the app turns `refetchOnWindowFocus` off globally), so the badge isn't stale for up
+ * to 30 s after the user returns.
  */
 export function useUnreadCount() {
     const { accessToken } = useAuthStore();
@@ -18,6 +20,7 @@ export function useUnreadCount() {
         queryFn: () => NotificationApi.unreadCount(),
         enabled: !!accessToken,
         refetchInterval: POLL_INTERVAL_MS,
+        refetchOnWindowFocus: true,
     });
 }
 
