@@ -4,7 +4,7 @@ import {
     OnApplicationShutdown,
     OnModuleInit,
 } from '@nestjs/common';
-import { Kafka, Partitioners, Producer } from 'kafkajs';
+import { Kafka, Partitioners } from 'kafkajs';
 import {
     KAFKA_TOPIC_PARTITIONS,
     KAFKA_TOPICS,
@@ -12,14 +12,15 @@ import {
 } from './kafka.topics';
 
 /**
- * Publie les événements métier de la Gateway sur Kafka (fire-and-forget).
+ * Publie les événements métier de la Gateway sur Kafka.
  *
- * À appeler **après** la résolution du `prisma.$transaction` : on ne publie que des faits
- * enregistrés. Ce n'est pas atomique pour autant (crash entre le commit et l'envoi = événement
- * perdu) ; un outbox transactionnel réglerait ça, hors v1.
- *
- * `publish()` ne lève jamais : la requête HTTP a déjà réussi côté base, une panne de Kafka ne
- * doit pas la transformer en erreur. Elle est seulement journalisée.
+ * - Au démarrage : crée les topics qui manquent (celui qui publie un topic le déclare), puis
+ *   connecte le producteur. Kafka est une infrastructure requise, comme la base : s'il est
+ *   absent, la Gateway ne démarre pas.
+ * - `publish()` est appelé **après** la transaction Prisma et ne lève jamais : la requête HTTP a
+ *   déjà réussi en base, un échec d'envoi est seulement journalisé. Ce n'est pas atomique
+ *   (crash entre le commit et l'envoi = événement perdu) ; un outbox transactionnel réglerait
+ *   ça, hors v1.
  */
 @Injectable()
 export class DomainEventPublisher
@@ -29,25 +30,17 @@ export class DomainEventPublisher
     private readonly kafka = new Kafka({
         clientId: 'gateway',
         brokers: (process.env.KAFKA_BROKERS ?? 'localhost:9094').split(','),
-        // Peu de tentatives : une requête ne doit pas rester bloquée longtemps si Kafka est
-        // tombé (même logique que le `max.block.ms=5000` de ms-auth-java).
-        retry: { retries: 2 },
     });
-    // DefaultPartitioner = murmur2, le même algorithme que le client Java : une clé donnée
-    // tombe sur la même partition quel que soit le producteur. Le déclarer explicitement coupe
-    // aussi l'avertissement de kafkajs sur le changement de partitionneur par défaut.
-    private readonly producer: Producer = this.kafka.producer({
+    // Même algorithme de partitionnement que le client Java (murmur2) : une clé donnée tombe sur
+    // la même partition quel que soit le producteur.
+    private readonly producer = this.kafka.producer({
         createPartitioner: Partitioners.DefaultPartitioner,
     });
-    private connecting?: Promise<void>;
 
-    /** Connexion au démarrage, sans bloquer ni faire échouer le boot si Kafka est absent. */
-    onModuleInit() {
-        this.ensureConnected().catch((err: Error) =>
-            this.logger.warn(
-                `Kafka indisponible au démarrage : ${err.message}`,
-            ),
-        );
+    async onModuleInit() {
+        await this.createMissingTopics();
+        await this.producer.connect();
+        this.logger.log('Connecté à Kafka');
     }
 
     async onApplicationShutdown() {
@@ -56,7 +49,6 @@ export class DomainEventPublisher
 
     async publish(topic: KafkaTopic, key: string, payload: object) {
         try {
-            await this.ensureConnected();
             await this.producer.send({
                 topic,
                 messages: [{ key, value: JSON.stringify(payload) }],
@@ -68,24 +60,11 @@ export class DomainEventPublisher
         }
     }
 
-    /**
-     * Connexion paresseuse et partagée : un échec est oublié, la publication suivante retente.
-     * Crée aussi les topics (3 partitions) s'ils n'existent pas, avant le premier envoi.
-     */
-    private ensureConnected(): Promise<void> {
-        this.connecting ??= this.connect().catch((err: unknown) => {
-            this.connecting = undefined;
-            throw err;
-        });
-        return this.connecting;
-    }
-
-    private async connect() {
+    /** Seulement ceux qui manquent : kafkajs journalise en ERROR un topic déjà existant. */
+    private async createMissingTopics() {
         const admin = this.kafka.admin();
         await admin.connect();
         try {
-            // Seulement les topics absents : kafkajs journalise en ERROR la réponse
-            // « topic déjà existant » (ms-notification-java les déclare aussi), même inoffensive.
             const existing = new Set(await admin.listTopics());
             const missing = Object.values(KAFKA_TOPICS).filter(
                 (topic) => !existing.has(topic),
@@ -102,7 +81,5 @@ export class DomainEventPublisher
         } finally {
             await admin.disconnect();
         }
-        await this.producer.connect();
-        this.logger.log('Connecté à Kafka');
     }
 }
