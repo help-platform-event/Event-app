@@ -61,23 +61,46 @@ describe('participations.transition', () => {
     });
 
     describe('CANCEL', () => {
-        it('should allow the owner to cancel a pending participation', () => {
-            const participation = { status: 'PENDING', userId: 'user1' } as any;
+        const participation = {
+            status: 'ACCEPTED',
+            userId: 'volunteer1',
+            event: { organizerId: 'organizer1' },
+        } as any;
 
+        it('should allow the participant to cancel their own participation', () => {
             expect(() =>
-                PARTICIPATION_TRANSITIONS.CANCEL.guard('user1', participation),
+                PARTICIPATION_TRANSITIONS.CANCEL.guard(
+                    'volunteer1',
+                    participation,
+                ),
             ).not.toThrow();
         });
 
-        it('should throw ForbiddenException when non-owner tries to cancel', () => {
-            const participation = { status: 'PENDING', userId: 'user1' } as any;
+        it("should allow the event's organizer to cancel a participation", () => {
+            expect(() =>
+                PARTICIPATION_TRANSITIONS.CANCEL.guard(
+                    'organizer1',
+                    participation,
+                ),
+            ).not.toThrow();
+        });
 
+        it('should throw ForbiddenException when anyone else tries to cancel', () => {
             expect(() =>
                 PARTICIPATION_TRANSITIONS.CANCEL.guard(
                     'someoneElse',
                     participation,
                 ),
             ).toThrow(ForbiddenException);
+        });
+
+        it('should throw BadRequestException when the participation is already rejected', () => {
+            expect(() =>
+                PARTICIPATION_TRANSITIONS.CANCEL.guard('volunteer1', {
+                    ...participation,
+                    status: 'REJECTED',
+                }),
+            ).toThrow(BadRequestException);
         });
 
         it('cancelled_at should return a Date, decision_at should return null', () => {
