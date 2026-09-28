@@ -16,4 +16,7 @@ export const queryKeys = {
     participationsBySlot: (slotId: number) => ['participations', 'slot', slotId] as const,
 
     me: ['me'] as const,
+
+    notifications: ['notifications'] as const,
+    notificationsUnreadCount: ['notifications', 'unread-count'] as const,
 };
