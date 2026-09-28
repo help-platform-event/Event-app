@@ -147,20 +147,6 @@ model Slot {
     @@index([mission_id])
 }
 
-model Notification {
-    id           Int               @id @default(autoincrement())
-    user_id      String
-    reference_id Int
-    title        String            @db.VarChar(150)
-    content      String            @db.MediumText
-    type         Notification_type
-    is_read      Boolean
-    created_at   DateTime          @db.DateTime(0)
-    updated_at   DateTime?         @db.DateTime(0)
-
-    @@index([user_id, type])
-}
-
 model Participation {
     id           Int                  @id @default(autoincrement())
     user_id      String
@@ -212,13 +198,6 @@ enum Slot_status {
     FULL
     CLOSED
     CANCELLED
-}
-
-enum Notification_type {
-    ANNOUNCEMENT
-    MESSAGE
-    MISSION
-    EVENT
 }
 
 enum Event_status {
