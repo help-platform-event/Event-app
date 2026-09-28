@@ -5,7 +5,11 @@ import { useAuthStore } from '../../auth/store/auth.store';
 import { queryKeys } from '../../../shared/tanstack/QueryKeys';
 import { toastMutation } from '../../../shared/utils/useToastMutation';
 
-/** The logged-in user's participations ("Mes missions"). */
+/**
+ * The logged-in user's participations ("Mes missions", and access to an event's members area).
+ * Always refetched when a page mounts (`staleTime: 0`, instead of the app's 60 s): the organizer
+ * may have accepted or cancelled a participation from their side in the meantime.
+ */
 export function useMyParticipations() {
     const { accessToken } = useAuthStore();
 
@@ -13,6 +17,7 @@ export function useMyParticipations() {
         queryKey: queryKeys.myParticipations,
         queryFn: () => ParticipationsApi.mine(),
         enabled: !!accessToken,
+        staleTime: 0,
     });
 }
 
