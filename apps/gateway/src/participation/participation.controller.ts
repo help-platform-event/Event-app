@@ -1,7 +1,21 @@
-import { Controller, Get, Post, Param, ParseIntPipe } from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    Post,
+    Param,
+    ParseIntPipe,
+    UseGuards,
+} from '@nestjs/common';
 import { ParticipationService } from './participation.service';
 import { User } from '../ms-auth/decorators/user.decorator';
-import { EventDto, MissionDto, ParticipantDto, SlotDto } from '@app/contracts';
+import {
+    EventDto,
+    MissionDto,
+    MyParticipationDto,
+    ParticipantDto,
+    SlotDto,
+} from '@app/contracts';
+import { AuthenticatedGuard } from '../ms-auth/guard/authenticated.guard';
 
 @Controller()
 export class ParticipationController {
@@ -28,9 +42,10 @@ export class ParticipationController {
     }
 
     @Get('me/participations')
+    @UseGuards(AuthenticatedGuard)
     async getMyParticipations(
         @User('id') userId: string,
-    ): Promise<ParticipantDto[]> {
+    ): Promise<MyParticipationDto[]> {
         return this.participationService.getMyParticipations(userId);
     }
 

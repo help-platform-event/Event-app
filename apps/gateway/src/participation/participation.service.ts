@@ -7,7 +7,13 @@ import {
     TransitionName,
 } from './policy/participations.transition';
 import { prisma, Prisma } from '@app/db';
-import { EventDto, MissionDto, ParticipantDto, SlotDto } from '@app/contracts';
+import {
+    EventDto,
+    MissionDto,
+    MyParticipationDto,
+    ParticipantDto,
+    SlotDto,
+} from '@app/contracts';
 import { assertCanCreateOrRejoin } from './policy/participation.guards';
 import { assertCanJoin } from './policy/slot.guards';
 import { toMissionDto } from '../mission/mapper/mission.mapper';
@@ -186,15 +192,55 @@ export class ParticipationService {
         return participation;
     }
 
-    async getMyParticipations(userId: string): Promise<ParticipantDto[]> {
+    /**
+     * The user's participations with their slot, mission and event, soonest slot first
+     * ("Mes missions" page). No participation → an empty list.
+     */
+    async getMyParticipations(userId: string): Promise<MyParticipationDto[]> {
         const participations = await prisma.participation.findMany({
             where: { user_id: userId },
+            orderBy: { Slot: { start_at: 'asc' } },
+            select: {
+                id: true,
+                status: true,
+                Slot: {
+                    select: {
+                        id: true,
+                        start_at: true,
+                        end_at: true,
+                        Mission: {
+                            select: {
+                                id: true,
+                                title: true,
+                                Event: {
+                                    select: {
+                                        id: true,
+                                        title: true,
+                                        start_date: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         });
 
-        if (participations.length === 0)
-            throw new NotFoundException("You don't have any participations");
-
-        return participations;
+        return participations.map((p) => ({
+            id: p.id,
+            status: p.status,
+            slot: {
+                id: p.Slot.id,
+                startAt: p.Slot.start_at.toISOString(),
+                endAt: p.Slot.end_at.toISOString(),
+            },
+            mission: { id: p.Slot.Mission.id, title: p.Slot.Mission.title },
+            event: {
+                id: p.Slot.Mission.Event.id,
+                title: p.Slot.Mission.Event.title,
+                startDate: p.Slot.Mission.Event.start_date.toISOString(),
+            },
+        }));
     }
 
     /**

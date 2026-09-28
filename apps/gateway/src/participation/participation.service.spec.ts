@@ -64,24 +64,57 @@ describe('ParticipationService', () => {
     });
 
     describe('getMyParticipations', () => {
-        it('should return participations for the user', async () => {
+        it('should map participations with their slot, mission and event', async () => {
             mockPrisma.participation.findMany.mockResolvedValue([
-                { id: 1, user_id: 'user1' },
+                {
+                    id: 3,
+                    status: 'ACCEPTED',
+                    Slot: {
+                        id: 10,
+                        start_at: new Date('2026-10-03T08:00:00Z'),
+                        end_at: new Date('2026-10-03T10:00:00Z'),
+                        Mission: {
+                            id: 5,
+                            title: 'Tri',
+                            Event: {
+                                id: 7,
+                                title: 'Clean-up day',
+                                start_date: new Date('2026-10-03T07:00:00Z'),
+                            },
+                        },
+                    },
+                },
             ] as any);
 
             const result = await service.getMyParticipations('user1');
 
-            expect(mockPrisma.participation.findMany).toHaveBeenCalledWith({
-                where: { user_id: 'user1' },
-            });
-            expect(result).toEqual([{ id: 1, user_id: 'user1' }]);
+            expect(mockPrisma.participation.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ where: { user_id: 'user1' } }),
+            );
+            expect(result).toEqual([
+                {
+                    id: 3,
+                    status: 'ACCEPTED',
+                    slot: {
+                        id: 10,
+                        startAt: '2026-10-03T08:00:00.000Z',
+                        endAt: '2026-10-03T10:00:00.000Z',
+                    },
+                    mission: { id: 5, title: 'Tri' },
+                    event: {
+                        id: 7,
+                        title: 'Clean-up day',
+                        startDate: '2026-10-03T07:00:00.000Z',
+                    },
+                },
+            ]);
         });
 
-        it('should throw NotFoundException when user has no participations', async () => {
+        it('should return an empty list when the user has no participations', async () => {
             mockPrisma.participation.findMany.mockResolvedValue([]);
 
-            await expect(service.getMyParticipations('user1')).rejects.toThrow(
-                "You don't have any participations",
+            await expect(service.getMyParticipations('user1')).resolves.toEqual(
+                [],
             );
         });
     });
