@@ -44,5 +44,3 @@ Variables: `apps/gateway/.env.example` (database, `MS_AUTH_URL`, `KAFKA_BROKERS`
 pnpm --filter gateway test    # Jest unit tests
 pnpm typecheck                # ESLint on every app
 ```
-
-CI: GitHub Actions quality checks on pull requests (`quality.yml`). The AWS V1 release pipeline (`release.yml`, `infra/docker/docker-compose.{staging,prod}.yml`) is frozen: manual trigger only, kept as an archive until the new deployment.
