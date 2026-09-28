@@ -16,3 +16,6 @@ export * from "./types/event/event.types.js";
 export * from "./types/event/event.contracts.js";
 // export * from "./types/address/address.types.js";
 export * from "./types/participation/participant.types.js";
+
+// EVENTS (Kafka)
+export * from "./events/participation.events.js";
