@@ -17,5 +17,8 @@ export * from "./types/event/event.contracts.js";
 // export * from "./types/address/address.types.js";
 export * from "./types/participation/participant.types.js";
 
+// NOTIFICATIONS (in-app)
+export * from "./notification/notification.contracts.js";
+
 // EVENTS (Kafka)
 export * from "./events/participation.events.js";

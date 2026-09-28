@@ -15,6 +15,7 @@ import { HealthController } from './health.controller';
 import { HealthModule } from './health.module';
 import { SettingsModule } from './settings/settings.module';
 import { KafkaModule } from './kafka/kafka.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
     imports: [
@@ -29,6 +30,7 @@ import { KafkaModule } from './kafka/kafka.module';
         GeoapifyModule,
         HealthModule,
         SettingsModule,
+        NotificationModule,
     ],
     controllers: [AppController, AuthController, HealthController],
     providers: [AppService],

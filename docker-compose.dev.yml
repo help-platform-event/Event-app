@@ -81,6 +81,8 @@ services:
             DATABASE_NAME: help
             # `app` = ms-auth-java, from the included compose file (same network).
             MS_AUTH_URL: http://app:8080
+            # `notification-app` = ms-notification-java, from the included compose file.
+            MS_NOTIFICATION_URL: http://notification-app:8085
             # ms-auth-java's broker, internal listener (see its compose.yaml).
             KAFKA_BROKERS: kafka:29092
             # Must match ms-auth-java's dev JWT_SECRET (see its compose.yaml): the Gateway
@@ -93,6 +95,8 @@ services:
             app:
                 condition: service_healthy
             kafka:
+                condition: service_healthy
+            notification-app:
                 condition: service_healthy
         restart: unless-stopped
 
