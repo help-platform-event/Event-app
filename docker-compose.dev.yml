@@ -81,6 +81,8 @@ services:
             DATABASE_NAME: help
             # `app` = ms-auth-java, from the included compose file (same network).
             MS_AUTH_URL: http://app:8080
+            # ms-auth-java's broker, internal listener (see its compose.yaml).
+            KAFKA_BROKERS: kafka:29092
             # Must match ms-auth-java's dev JWT_SECRET (see its compose.yaml): the Gateway
             # verifies the access tokens that ms-auth-java signs.
             JWT_ACCESS_SECRET: c2FtcGxlLWRldi1vbmx5LXNlY3JldC1kby1ub3QtdXNlLWluLXByb2QtMzJieXRlcyE=
@@ -89,6 +91,8 @@ services:
             db-migrate:
                 condition: service_completed_successfully
             app:
+                condition: service_healthy
+            kafka:
                 condition: service_healthy
         restart: unless-stopped
 

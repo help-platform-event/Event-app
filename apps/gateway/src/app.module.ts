@@ -14,10 +14,12 @@ import { AuthController } from './ms-auth/auth.controller';
 import { HealthController } from './health.controller';
 import { HealthModule } from './health.module';
 import { SettingsModule } from './settings/settings.module';
+import { KafkaModule } from './kafka/kafka.module';
 
 @Module({
     imports: [
         MsAuthClientModule,
+        KafkaModule,
         ConfigModule.forRoot({ isGlobal: true }),
         EventModule,
         MissionModule,
