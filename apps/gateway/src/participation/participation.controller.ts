@@ -8,16 +8,15 @@ import {
 } from '@nestjs/common';
 import { ParticipationService } from './participation.service';
 import { User } from '../ms-auth/decorators/user.decorator';
-import {
-    EventDto,
-    MissionDto,
-    MyParticipationDto,
-    ParticipantDto,
-    SlotDto,
-} from '@app/contracts';
+import { MyParticipationDto, ParticipantDto } from '@app/contracts';
 import { AuthenticatedGuard } from '../ms-auth/guard/authenticated.guard';
 
+/**
+ * Participations. Every route acts for the logged-in user (register, answer a request, cancel,
+ * list their own participations): anonymous requests get a 401.
+ */
 @Controller()
+@UseGuards(AuthenticatedGuard)
 export class ParticipationController {
     constructor(private readonly participationService: ParticipationService) {}
 
@@ -29,41 +28,11 @@ export class ParticipationController {
         return this.participationService.create(userId, slotId);
     }
 
-    @Get('participations')
-    async findAll(): Promise<ParticipantDto[]> {
-        return this.participationService.findAll();
-    }
-
-    @Get('participations/:id')
-    async findOne(
-        @Param('id', ParseIntPipe) id: number,
-    ): Promise<ParticipantDto> {
-        return this.participationService.findOne(id);
-    }
-
     @Get('me/participations')
-    @UseGuards(AuthenticatedGuard)
     async getMyParticipations(
         @User('id') userId: string,
     ): Promise<MyParticipationDto[]> {
         return this.participationService.getMyParticipations(userId);
-    }
-
-    @Get('me/slots')
-    async getMySlots(@User('id') userId: string): Promise<SlotDto[]> {
-        return this.participationService.getMySlots(userId);
-    }
-
-    @Get('me/missions')
-    async getMyMissions(@User('id') userId: string): Promise<MissionDto[]> {
-        return this.participationService.getMyMissions(userId);
-    }
-
-    @Get('me/events')
-    async getMyEvents(
-        @User('id') userId: string,
-    ): Promise<Omit<EventDto, 'address' | 'missions'>[]> {
-        return this.participationService.getMyEvents(userId);
     }
 
     @Post('participations/:id/accept')
