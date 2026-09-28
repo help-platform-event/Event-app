@@ -6,6 +6,7 @@
 export const KAFKA_TOPICS = {
     PARTICIPATION_REQUESTED: 'event.participation.requested',
     PARTICIPATION_DECIDED: 'event.participation.decided',
+    PARTICIPATION_CANCELLED: 'event.participation.cancelled',
 } as const;
 
 export type KafkaTopic = (typeof KAFKA_TOPICS)[keyof typeof KAFKA_TOPICS];

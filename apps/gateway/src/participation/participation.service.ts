@@ -21,6 +21,7 @@ import { participationQuery } from './query/participation.query';
 import { DomainEventPublisher } from '../kafka/domain-event.publisher';
 import { KAFKA_TOPICS } from '../kafka/kafka.topics';
 import type {
+    ParticipationCancelledEvent,
     ParticipationDecidedEvent,
     ParticipationRequestedEvent,
 } from '@app/contracts';
@@ -418,7 +419,8 @@ export class ParticipationService {
 
     /**
      * Applies an ACCEPT / REJECT / CANCEL transition. Once committed, an ACCEPT or REJECT
-     * notifies the participant through Kafka (`event.participation.decided`).
+     * notifies the participant through Kafka (`event.participation.decided`), and a CANCEL notifies
+     * the other party (`event.participation.cancelled`).
      */
     async transition(
         userId: string,
@@ -429,25 +431,46 @@ export class ParticipationService {
             this.applyTransition(tx, userId, participationId, action),
         );
 
+        const base = {
+            eventId: randomUUID(),
+            occurredAt: new Date().toISOString(),
+            participationId,
+            actorUserId: userId,
+            event: {
+                id: participation.event.id,
+                title: participation.event.title,
+            },
+            slot: {
+                id: participation.slotId,
+                startAt: participation.slotStartAt.toISOString(),
+            },
+        };
+
         if (updated.status === 'ACCEPTED' || updated.status === 'REJECTED') {
             const payload: ParticipationDecidedEvent = {
-                eventId: randomUUID(),
-                occurredAt: new Date().toISOString(),
-                participationId,
+                ...base,
                 recipientUserId: participation.userId,
-                actorUserId: userId,
-                event: {
-                    id: participation.event.id,
-                    title: participation.event.title,
-                },
-                slot: {
-                    id: participation.slotId,
-                    startAt: participation.slotStartAt.toISOString(),
-                },
                 status: updated.status,
             };
             await this.events.publish(
                 KAFKA_TOPICS.PARTICIPATION_DECIDED,
+                payload.recipientUserId,
+                payload,
+            );
+        }
+
+        if (updated.status === 'CANCELLED') {
+            // Le bénévole annule → on prévient l'organisateur ; l'organisateur annule → le bénévole.
+            const byParticipant = userId === participation.userId;
+            const payload: ParticipationCancelledEvent = {
+                ...base,
+                recipientUserId: byParticipant
+                    ? participation.event.organizerId
+                    : participation.userId,
+                cancelledBy: byParticipant ? 'PARTICIPANT' : 'ORGANIZER',
+            };
+            await this.events.publish(
+                KAFKA_TOPICS.PARTICIPATION_CANCELLED,
                 payload.recipientUserId,
                 payload,
             );

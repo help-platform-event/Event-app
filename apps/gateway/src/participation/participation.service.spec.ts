@@ -536,27 +536,43 @@ describe('ParticipationService', () => {
             );
         });
 
-        it('should not publish anything for a CANCEL', async () => {
-            mockTx.participation.findUnique.mockResolvedValue({
-                user_id: 'applicant1',
-                status: 'PENDING',
-                slot_id: 1,
-                Slot: pendingSlot,
-            });
-            mockTx.participation.update.mockResolvedValue({
-                id: 3,
-                status: 'CANCELLED',
-            });
-            mockTx.slot.findUniqueOrThrow.mockResolvedValue({
-                max_participant: 5,
-                status: 'OPEN',
-            });
-            mockTx.participation.count.mockResolvedValue(0);
+        it.each([
+            ['applicant1', 'organizer1', 'PARTICIPANT'],
+            ['organizer1', 'applicant1', 'ORGANIZER'],
+        ])(
+            'should notify the other party when %s cancels',
+            async (actor, recipient, cancelledBy) => {
+                mockTx.participation.findUnique.mockResolvedValue({
+                    user_id: 'applicant1',
+                    status: 'ACCEPTED',
+                    slot_id: 1,
+                    Slot: pendingSlot,
+                });
+                mockTx.participation.update.mockResolvedValue({
+                    id: 3,
+                    status: 'CANCELLED',
+                });
+                mockTx.slot.findUniqueOrThrow.mockResolvedValue({
+                    max_participant: 5,
+                    status: 'OPEN',
+                });
+                mockTx.participation.count.mockResolvedValue(0);
 
-            await service.transition('applicant1', 3, 'CANCEL');
+                await service.transition(actor, 3, 'CANCEL');
 
-            expect(publisher.publish).not.toHaveBeenCalled();
-        });
+                expect(publisher.publish).toHaveBeenCalledWith(
+                    'event.participation.cancelled',
+                    recipient,
+                    expect.objectContaining({
+                        participationId: 3,
+                        recipientUserId: recipient,
+                        actorUserId: actor,
+                        cancelledBy,
+                        event: { id: 7, title: 'Clean-up day' },
+                    }),
+                );
+            },
+        );
 
         it('should not publish anything when the transition is refused', async () => {
             mockTx.participation.findUnique.mockResolvedValue({
