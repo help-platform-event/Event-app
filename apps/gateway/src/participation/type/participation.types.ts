@@ -8,3 +8,16 @@ export interface ParticipationWithStatusAndOrganizer {
         organizerId: string;
     };
 }
+
+/**
+ * Participation + de quoi décrire l'événement publié sur Kafka après une transition
+ * (titre de l'événement, début du créneau).
+ */
+export interface ParticipationContext extends ParticipationWithStatusAndOrganizer {
+    event: {
+        id: number;
+        title: string;
+        organizerId: string;
+    };
+    slotStartAt: Date;
+}

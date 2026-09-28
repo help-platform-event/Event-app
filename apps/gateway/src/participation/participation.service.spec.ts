@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { prisma } from '@app/db';
 import { ParticipationService } from './participation.service';
+import { DomainEventPublisher } from '../kafka/domain-event.publisher';
 
 jest.mock('@app/db', () => ({
     prisma: {
@@ -16,9 +17,12 @@ jest.mock('@app/db', () => ({
 describe('ParticipationService', () => {
     let service: ParticipationService;
     const mockPrisma = prisma as any;
+    const publisher = { publish: jest.fn() };
 
     beforeEach(() => {
-        service = new ParticipationService();
+        service = new ParticipationService(
+            publisher as unknown as DomainEventPublisher,
+        );
         jest.clearAllMocks();
     });
 
@@ -206,6 +210,19 @@ describe('ParticipationService', () => {
 
     describe('create', () => {
         let mockTx: any;
+        const openSlot = {
+            id: 1,
+            status: 'OPEN',
+            max_participant: 5,
+            start_at: new Date('2026-10-03T08:00:00Z'),
+            Mission: {
+                Event: {
+                    id: 7,
+                    title: 'Clean-up day',
+                    organizer_id: 'organizer1',
+                },
+            },
+        };
 
         beforeEach(() => {
             mockTx = {
@@ -226,11 +243,7 @@ describe('ParticipationService', () => {
         });
 
         it('should create a new participation when slot exists and user can join', async () => {
-            mockTx.slot.findUnique.mockResolvedValue({
-                id: 1,
-                status: 'OPEN',
-                max_participant: 5,
-            });
+            mockTx.slot.findUnique.mockResolvedValue(openSlot);
             mockTx.participation.count.mockResolvedValue(2);
             mockTx.participation.findUnique.mockResolvedValue(null);
             mockTx.participation.create.mockResolvedValue({
@@ -252,19 +265,47 @@ describe('ParticipationService', () => {
             );
         });
 
+        it('should notify the organizer through Kafka once committed', async () => {
+            mockTx.slot.findUnique.mockResolvedValue(openSlot);
+            mockTx.participation.count.mockResolvedValue(0);
+            mockTx.participation.findUnique.mockResolvedValue(null);
+            mockTx.participation.create.mockResolvedValue({
+                id: 42,
+                user_id: 'user1',
+                slot_id: 1,
+                status: 'PENDING',
+            });
+
+            await service.create('user1', 1);
+
+            expect(publisher.publish).toHaveBeenCalledWith(
+                'event.participation.requested',
+                'organizer1',
+                expect.objectContaining({
+                    eventId: expect.any(String),
+                    occurredAt: expect.any(String),
+                    participationId: 42,
+                    recipientUserId: 'organizer1',
+                    actorUserId: 'user1',
+                    event: { id: 7, title: 'Clean-up day' },
+                    slot: { id: 1, startAt: '2026-10-03T08:00:00.000Z' },
+                }),
+            );
+        });
+
         it('should throw NotFoundException when slot does not exist', async () => {
             mockTx.slot.findUnique.mockResolvedValue(null);
 
             await expect(service.create('user1', 999)).rejects.toThrow(
                 'Slot not found',
             );
+            expect(publisher.publish).not.toHaveBeenCalled();
         });
 
         it('should throw BadRequestException when slot is full', async () => {
             mockTx.slot.findUnique.mockResolvedValue({
-                id: 1,
+                ...openSlot,
                 status: 'FULL',
-                max_participant: 5,
             });
             mockTx.participation.count.mockResolvedValue(5);
             mockTx.participation.findUnique.mockResolvedValue(null);
@@ -275,11 +316,7 @@ describe('ParticipationService', () => {
         });
 
         it('should update (rejoin) when existing participation is CANCELLED', async () => {
-            mockTx.slot.findUnique.mockResolvedValue({
-                id: 1,
-                status: 'OPEN',
-                max_participant: 5,
-            });
+            mockTx.slot.findUnique.mockResolvedValue(openSlot);
             mockTx.participation.count.mockResolvedValue(2);
             mockTx.participation.findUnique.mockResolvedValue({
                 status: 'CANCELLED',
@@ -300,11 +337,7 @@ describe('ParticipationService', () => {
         });
 
         it('should throw ConflictException when already registered (not cancelled)', async () => {
-            mockTx.slot.findUnique.mockResolvedValue({
-                id: 1,
-                status: 'OPEN',
-                max_participant: 5,
-            });
+            mockTx.slot.findUnique.mockResolvedValue(openSlot);
             mockTx.participation.count.mockResolvedValue(2);
             mockTx.participation.findUnique.mockResolvedValue({
                 status: 'PENDING',
@@ -318,6 +351,16 @@ describe('ParticipationService', () => {
 
     describe('transition', () => {
         let mockTx: any;
+        const pendingSlot = {
+            start_at: new Date('2026-10-03T08:00:00Z'),
+            Mission: {
+                Event: {
+                    id: 7,
+                    title: 'Clean-up day',
+                    organizer_id: 'organizer1',
+                },
+            },
+        };
 
         beforeEach(() => {
             mockTx = {
@@ -342,7 +385,7 @@ describe('ParticipationService', () => {
                 user_id: 'applicant1',
                 status: 'PENDING',
                 slot_id: 1,
-                Slot: { Mission: { Event: { organizer_id: 'organizer1' } } },
+                Slot: pendingSlot,
             });
             mockTx.participation.update.mockResolvedValue({
                 id: 1,
@@ -380,7 +423,7 @@ describe('ParticipationService', () => {
                 user_id: 'applicant1',
                 status: 'PENDING',
                 slot_id: 1,
-                Slot: { Mission: { Event: { organizer_id: 'organizer1' } } },
+                Slot: pendingSlot,
             });
 
             await expect(
@@ -395,7 +438,7 @@ describe('ParticipationService', () => {
                 user_id: 'applicant1',
                 status: 'PENDING',
                 slot_id: 1,
-                Slot: { Mission: { Event: { organizer_id: 'organizer1' } } },
+                Slot: pendingSlot,
             });
             mockTx.participation.update.mockResolvedValue({
                 id: 1,
@@ -420,7 +463,7 @@ describe('ParticipationService', () => {
                 user_id: 'applicant1',
                 status: 'PENDING',
                 slot_id: 1,
-                Slot: { Mission: { Event: { organizer_id: 'organizer1' } } },
+                Slot: pendingSlot,
             });
             mockTx.participation.update.mockResolvedValue({
                 id: 1,
@@ -430,6 +473,70 @@ describe('ParticipationService', () => {
             await service.transition('organizer1', 1, 'REJECT');
 
             expect(mockTx.slot.findUniqueOrThrow).not.toHaveBeenCalled();
+        });
+
+        it('should notify the participant of the decision once committed', async () => {
+            mockTx.participation.findUnique.mockResolvedValue({
+                user_id: 'applicant1',
+                status: 'PENDING',
+                slot_id: 1,
+                Slot: pendingSlot,
+            });
+            mockTx.participation.update.mockResolvedValue({
+                id: 3,
+                status: 'REJECTED',
+            });
+
+            await service.transition('organizer1', 3, 'REJECT');
+
+            expect(publisher.publish).toHaveBeenCalledWith(
+                'event.participation.decided',
+                'applicant1',
+                expect.objectContaining({
+                    participationId: 3,
+                    recipientUserId: 'applicant1',
+                    actorUserId: 'organizer1',
+                    event: { id: 7, title: 'Clean-up day' },
+                    slot: { id: 1, startAt: '2026-10-03T08:00:00.000Z' },
+                    status: 'REJECTED',
+                }),
+            );
+        });
+
+        it('should not publish anything for a CANCEL', async () => {
+            mockTx.participation.findUnique.mockResolvedValue({
+                user_id: 'applicant1',
+                status: 'PENDING',
+                slot_id: 1,
+                Slot: pendingSlot,
+            });
+            mockTx.participation.update.mockResolvedValue({
+                id: 3,
+                status: 'CANCELLED',
+            });
+            mockTx.slot.findUniqueOrThrow.mockResolvedValue({
+                max_participant: 5,
+                status: 'OPEN',
+            });
+            mockTx.participation.count.mockResolvedValue(0);
+
+            await service.transition('applicant1', 3, 'CANCEL');
+
+            expect(publisher.publish).not.toHaveBeenCalled();
+        });
+
+        it('should not publish anything when the transition is refused', async () => {
+            mockTx.participation.findUnique.mockResolvedValue({
+                user_id: 'applicant1',
+                status: 'PENDING',
+                slot_id: 1,
+                Slot: pendingSlot,
+            });
+
+            await expect(
+                service.transition('someoneElse', 1, 'ACCEPT'),
+            ).rejects.toThrow();
+            expect(publisher.publish).not.toHaveBeenCalled();
         });
     });
 });
