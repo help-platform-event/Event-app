@@ -1,9 +1,11 @@
-# Full dev stack in one command (requires ms-auth-java cloned next to this repo):
+# Full dev stack in one command (requires ms-auth-java and ms-notification-java cloned next to this repo):
 #   docker compose -f docker-compose.dev.yml --profile app up --build
 # `--profile app` is needed because ms-auth-java keeps its own `app` service behind that profile.
 include:
-    # ms-auth-java's MySQL (3307), Kafka (9094), Adminer (8081) and the app itself (8080).
+    # ms-auth-java's MySQL (3307), Kafka (9094) + Kafka UI (8082), Adminer (8081) and the app (8080).
     - ../ms-auth-java/compose.yaml
+    # ms-notification-java's MySQL (3309), Mailpit (SMTP 1025, UI 8025) and the app (8085).
+    - ../ms-notification-java/compose.yaml
 
 services:
     # -------------------------
@@ -79,6 +81,8 @@ services:
             DATABASE_NAME: help
             # `app` = ms-auth-java, from the included compose file (same network).
             MS_AUTH_URL: http://app:8080
+            # ms-auth-java's broker, internal listener (see its compose.yaml).
+            KAFKA_BROKERS: kafka:29092
             # Must match ms-auth-java's dev JWT_SECRET (see its compose.yaml): the Gateway
             # verifies the access tokens that ms-auth-java signs.
             JWT_ACCESS_SECRET: c2FtcGxlLWRldi1vbmx5LXNlY3JldC1kby1ub3QtdXNlLWluLXByb2QtMzJieXRlcyE=
@@ -87,6 +91,8 @@ services:
             db-migrate:
                 condition: service_completed_successfully
             app:
+                condition: service_healthy
+            kafka:
                 condition: service_healthy
         restart: unless-stopped
 

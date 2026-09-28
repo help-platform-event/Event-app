@@ -1,6 +1,7 @@
 import { SlotMapper } from './../slot/dto/mapper/slot.mapper';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ParticipationWithStatusAndOrganizer } from './type/participation.types';
+import { randomUUID } from 'node:crypto';
+import { ParticipationContext } from './type/participation.types';
 import {
     PARTICIPATION_TRANSITIONS,
     TransitionName,
@@ -11,9 +12,17 @@ import { assertCanCreateOrRejoin } from './policy/participation.guards';
 import { assertCanJoin } from './policy/slot.guards';
 import { toMissionDto } from '../mission/mapper/mission.mapper';
 import { participationQuery } from './query/participation.query';
+import { DomainEventPublisher } from '../kafka/domain-event.publisher';
+import { KAFKA_TOPICS } from '../kafka/kafka.topics';
+import type {
+    ParticipationDecidedEvent,
+    ParticipationRequestedEvent,
+} from '@app/contracts';
 
 @Injectable()
 export class ParticipationService {
+    constructor(private readonly events: DomainEventPublisher) {}
+
     /**
      * Create a participation on a slot :
      *  - Check if slot exist
@@ -27,43 +36,76 @@ export class ParticipationService {
      *
      * @param currentUserId The currently logged-in User
      * @param slotId The slot of a mission
+     * Once committed, the organizer is notified through Kafka
+     * (`event.participation.requested`).
+     *
      * @returns Creation of a participation in "Pending" state
      */
     async create(
         currentUserId: string,
         slotId: number,
     ): Promise<ParticipantDto> {
-        return await prisma.$transaction(async (tx) => {
-            //Check if slot exist
-            const slot = await this.getSlotOrThrow(tx, slotId);
+        const { participation, slot } = await prisma.$transaction(
+            async (tx) => {
+                //Check if slot exist
+                const slot = await this.getSlotOrThrow(tx, slotId);
 
-            //Get currentParticipants and Check if already registered
-            const { existing, currentParticipants } = await this.getSlotContext(
-                tx,
-                slotId,
-                currentUserId,
-            );
+                //Get currentParticipants and Check if already registered
+                const { existing, currentParticipants } =
+                    await this.getSlotContext(tx, slotId, currentUserId);
 
-            //Policies
-            assertCanCreateOrRejoin(existing);
-            assertCanJoin(slot, currentParticipants);
+                //Policies
+                assertCanCreateOrRejoin(existing);
+                assertCanJoin(slot, currentParticipants);
 
-            //Update or Create participation
-            const participation = await this.createOrRejointParticipation(
-                tx,
-                currentUserId,
-                slotId,
-                existing,
-            );
+                //Update or Create participation
+                const participation = await this.createOrRejointParticipation(
+                    tx,
+                    currentUserId,
+                    slotId,
+                    existing,
+                );
 
-            return participation;
-        });
+                return { participation, slot };
+            },
+        );
+
+        const event = slot.Mission.Event;
+        const payload: ParticipationRequestedEvent = {
+            eventId: randomUUID(),
+            occurredAt: new Date().toISOString(),
+            participationId: participation.id,
+            recipientUserId: event.organizer_id,
+            actorUserId: currentUserId,
+            event: { id: event.id, title: event.title },
+            slot: { id: slot.id, startAt: slot.start_at.toISOString() },
+        };
+        await this.events.publish(
+            KAFKA_TOPICS.PARTICIPATION_REQUESTED,
+            payload.recipientUserId,
+            payload,
+        );
+
+        return participation;
     }
 
     private async getSlotOrThrow(tx: Prisma.TransactionClient, slotId: number) {
-        //Check if slot exist
+        //Check if slot exist (with its event, needed for the notification)
         const slot = await tx.slot.findUnique({
             where: { id: slotId },
+            include: {
+                Mission: {
+                    select: {
+                        Event: {
+                            select: {
+                                id: true,
+                                title: true,
+                                organizer_id: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         if (!slot) throw new NotFoundException('Slot not found');
@@ -328,14 +370,44 @@ export class ParticipationService {
         );
     }
 
+    /**
+     * Applies an ACCEPT / REJECT / CANCEL transition. Once committed, an ACCEPT or REJECT
+     * notifies the participant through Kafka (`event.participation.decided`).
+     */
     async transition(
         userId: string,
         participationId: number,
         action: TransitionName,
     ): Promise<ParticipantDto> {
-        return prisma.$transaction((tx) =>
+        const { updated, participation } = await prisma.$transaction((tx) =>
             this.applyTransition(tx, userId, participationId, action),
         );
+
+        if (updated.status === 'ACCEPTED' || updated.status === 'REJECTED') {
+            const payload: ParticipationDecidedEvent = {
+                eventId: randomUUID(),
+                occurredAt: new Date().toISOString(),
+                participationId,
+                recipientUserId: participation.userId,
+                actorUserId: userId,
+                event: {
+                    id: participation.event.id,
+                    title: participation.event.title,
+                },
+                slot: {
+                    id: participation.slotId,
+                    startAt: participation.slotStartAt.toISOString(),
+                },
+                status: updated.status,
+            };
+            await this.events.publish(
+                KAFKA_TOPICS.PARTICIPATION_DECIDED,
+                payload.recipientUserId,
+                payload,
+            );
+        }
+
+        return updated;
     }
 
     private async applyTransition(
@@ -343,7 +415,10 @@ export class ParticipationService {
         userId: string,
         participationId: number,
         action: TransitionName,
-    ): Promise<ParticipantDto> {
+    ): Promise<{
+        updated: ParticipantDto;
+        participation: ParticipationContext;
+    }> {
         const participation = await this.findWithContextOrThrow(
             tx,
             participationId,
@@ -367,13 +442,13 @@ export class ParticipationService {
             await this.syncSlotStatus(tx, participation.slotId);
         }
 
-        return updated;
+        return { updated, participation };
     }
 
     async findWithContextOrThrow(
         tx: Prisma.TransactionClient,
         participationId: number,
-    ): Promise<ParticipationWithStatusAndOrganizer> {
+    ): Promise<ParticipationContext> {
         const participation = await tx.participation.findUnique({
             where: { id: participationId },
             select: {
@@ -382,10 +457,13 @@ export class ParticipationService {
                 slot_id: true,
                 Slot: {
                     select: {
+                        start_at: true,
                         Mission: {
                             select: {
                                 Event: {
                                     select: {
+                                        id: true,
+                                        title: true,
                                         organizer_id: true,
                                     },
                                 },
@@ -402,8 +480,11 @@ export class ParticipationService {
             status: participation.status,
             slotId: participation.slot_id,
             event: {
+                id: participation.Slot.Mission.Event.id,
+                title: participation.Slot.Mission.Event.title,
                 organizerId: participation.Slot.Mission.Event.organizer_id,
             },
+            slotStartAt: participation.Slot.start_at,
         };
     }
 
