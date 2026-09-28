@@ -23,7 +23,13 @@ Monorepo (pnpm + Turborepo):
 - **Auth delegated to [`ms-auth-java`](https://github.com/help-platform-event/ms-auth-java)**: signup, login, profile and settings calls are relayed over HTTP (`MS_AUTH_URL`). The access tokens it issues are verified locally, with the same secret (`JWT_ACCESS_SECRET`).
 - **Kafka events**: after a participation request or decision is committed, the Gateway publishes `event.participation.requested` (to notify the organizer) or `event.participation.decided` (to notify the volunteer), keyed by the user to notify (`apps/gateway/src/kafka`). It creates these two topics at startup: whoever publishes a topic declares it. The payload types are in `packages/contracts/src/events`.
   - It uses [kafkajs](https://kafka.js.org/). kafkajs is no longer maintained, but it's kept on purpose: it's pure JavaScript, simple, and has no known vulnerability. Its official successor, `@confluentinc/kafka-javascript`, has a compatible API if it ever needs replacing.
+- **In-app notifications**: `/notifications` relays the bell's requests to `ms-notification-java` (`MS_NOTIFICATION_URL`), forwarding the user's token; anonymous requests get a 401 in the Gateway.
 - **Geocoding**: event addresses are geocoded with Geoapify (`GEOAPIFY_API_KEY`).
+- Both Java service clients share `src/utils/http/ServiceHttpClient`: a non-2xx `ProblemDetail` becomes an `HttpException` with its `detail`, and an unreachable service becomes a 503.
+
+## The Front
+
+- The notification bell (`features/notification`), in the logged-in layout's header: the unread badge is refreshed by **polling** (React Query, every 30 s, paused while the tab is hidden), and the menu lists the latest notifications.
 
 ## Develop
 
@@ -36,7 +42,7 @@ pnpm install
 pnpm dev          # turbo: Front (5173) + Gateway (3000) in watch mode
 ```
 
-Variables: `apps/gateway/.env.example` (database, `MS_AUTH_URL`, `KAFKA_BROKERS`, JWT, Geoapify) and `apps/front/.env.example` (`VITE_API_URL`, Google client id, Geoapify key).
+Variables: `apps/gateway/.env.example` (database, `MS_AUTH_URL`, `MS_NOTIFICATION_URL`, `KAFKA_BROKERS`, JWT, Geoapify) and `apps/front/.env.example` (`VITE_API_URL`, Google client id, Geoapify key).
 
 ## Tests and quality
 
