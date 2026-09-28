@@ -1,21 +1,11 @@
-import {
-    ParticipantDetailsDto,
-    participationStatusLabel,
-    ParticipationStatus,
-} from '@app/contracts';
+import { ParticipantDetailsDto, participationStatusLabel } from '@app/contracts';
+import { participationStatusColor } from './participationStatus';
 import { TransitionAction } from '../hooks/use_participationTransition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Flex } from '@/components/layout/flex';
 import { Separator } from '@/components/ui/separator';
-
-const participationStatusColor: Record<ParticipationStatus, string> = {
-    ACCEPTED: 'bg-green-100 text-green-800 border-green-200',
-    PENDING: 'bg-amber-100 text-amber-800 border-amber-200',
-    REJECTED: 'bg-red-100 text-red-800 border-red-200',
-    CANCELLED: 'bg-zinc-100 text-zinc-800 border-zinc-200',
-};
 
 type HandleParticipantItemProps = {
     participations: ParticipantDetailsDto[];
