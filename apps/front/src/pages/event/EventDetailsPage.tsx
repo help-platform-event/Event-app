@@ -52,7 +52,8 @@ export function EventDetailsPage() {
                         <EventDocuments />
                     </TabsContent>
                     <TabsContent value="discussion">
-                        <EventDiscussion />
+                        {/* key: another event gets a fresh discussion (messages, connection) */}
+                        <EventDiscussion key={event.id} eventId={event.id} />
                     </TabsContent>
                 </>
             )}

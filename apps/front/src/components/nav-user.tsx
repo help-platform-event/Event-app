@@ -21,16 +21,7 @@ import { useSignout } from '@/features/auth/hooks/use_auth.service';
 import { ChevronsUpDownIcon, BellIcon, LogOutIcon, Moon, Sun, UserIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { useTheme } from './theme-provider';
-
-/** « Marie Dupont » → « MD » ; sans nom, la première lettre de l'email. */
-function initialsOf(name: string, email: string): string {
-    const words = name.trim().split(/\s+/).filter(Boolean);
-    if (words.length === 0) return email.charAt(0).toUpperCase() || '?';
-    return words
-        .slice(0, 2)
-        .map((word) => word.charAt(0).toUpperCase())
-        .join('');
-}
+import { initialsOf } from '@/shared/utils/initials';
 
 export function NavUser({
     user,
