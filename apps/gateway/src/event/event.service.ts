@@ -13,7 +13,12 @@ import { CreateAddressDto } from '../address/dto/create-address.dto';
 import { toGeocodeDto } from '../address/mapper/address.mapper';
 import { Coordinates } from '../geoapify/type/geoapify.type';
 import { Prisma, prisma } from '@app/db';
-import { EventDto, EventWithAddress, PaginatedEventsDto } from '@app/contracts';
+import {
+    EventDto,
+    EventMemberDto,
+    EventWithAddress,
+    PaginatedEventsDto,
+} from '@app/contracts';
 import { MsAuthClient } from '../ms-auth-client/ms-auth-client.service';
 import { eventDetailsQuery } from './query/event-details.query';
 import { eventWithAddressQuery } from './query/event-address.query';
@@ -369,6 +374,58 @@ export class EventService {
         if (!event) throw new NotFoundException('Événement non trouvé');
 
         return toEventDetails(event, userId);
+    }
+
+    /**
+     * Les membres d'un évènement : son organisateur et les bénévoles ayant au moins une
+     * participation ACCEPTED sur l'un de ses créneaux. Réservé aux membres eux-mêmes (403 sinon) :
+     * c'est la règle d'accès de l'espace membres (Documents, Discussion), écrite ici seulement.
+     * ms-chat-java l'appelle avec le token de l'utilisateur pour décider s'il peut rejoindre la
+     * discussion, et le Front s'en sert pour afficher les auteurs des messages.
+     */
+    async findMembers(
+        eventId: number,
+        userId: string,
+        accessToken: string,
+    ): Promise<EventMemberDto[]> {
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { organizer_id: true },
+        });
+        if (!event) throw new NotFoundException('Événement non trouvé');
+
+        const accepted = await prisma.participation.findMany({
+            where: {
+                status: 'ACCEPTED',
+                Slot: { Mission: { event_id: eventId } },
+            },
+            select: { user_id: true },
+            distinct: ['user_id'],
+        });
+        const volunteerIds = accepted
+            .map((p) => p.user_id)
+            .filter((id) => id !== event.organizer_id);
+        const memberIds = [event.organizer_id, ...volunteerIds];
+
+        if (!memberIds.includes(userId)) {
+            throw new ForbiddenException(
+                "Réservé à l'organisateur et aux bénévoles acceptés",
+            );
+        }
+
+        const profiles = new Map(
+            (await this.msAuthClient.getProfiles(accessToken, memberIds)).map(
+                (profile) => [profile.id, profile],
+            ),
+        );
+
+        return memberIds.map((id) => ({
+            id,
+            first_name: profiles.get(id)?.first_name ?? null,
+            last_name: profiles.get(id)?.last_name ?? null,
+            avatar_url: profiles.get(id)?.avatar_url ?? null,
+            role: id === event.organizer_id ? 'ORGANIZER' : 'VOLUNTEER',
+        }));
     }
 
     async findOne(id: number): Promise<EventWithAddress> {

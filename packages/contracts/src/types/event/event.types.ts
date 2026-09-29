@@ -111,3 +111,15 @@ export type PaginatedEventsApiResponse = Paginated<EventApiResponse>;
 
 // type frontend paginé
 export type PaginatedEvents = Paginated<EventWithAddress>;
+
+/**
+ * A member of an event: its organizer, or a volunteer with an accepted participation. Only
+ * members may see an event's members area (Documents, Discussion).
+ */
+export interface EventMemberDto {
+	id: string;
+	first_name: string | null;
+	last_name: string | null;
+	avatar_url: string | null;
+	role: "ORGANIZER" | "VOLUNTEER";
+}

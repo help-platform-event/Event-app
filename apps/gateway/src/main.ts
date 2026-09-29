@@ -5,6 +5,8 @@ import { ValidationPipe } from '@nestjs/common/pipes/validation.pipe';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './utils/filters/exception-filter';
 import cookieParser from 'cookie-parser';
+import type { Server } from 'node:http';
+import { attachChatProxy } from './chat/chat-proxy';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
@@ -32,6 +34,7 @@ async function bootstrap() {
         }),
     );
     await app.listen(process.env.PORT ?? 3000);
+    attachChatProxy(app.getHttpServer() as Server);
     console.log('gateway running 🚀');
 }
 void bootstrap();

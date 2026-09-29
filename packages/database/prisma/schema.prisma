@@ -76,7 +76,6 @@ model Event {
     Document     Document[]
     Address      Address        @relation(fields: [address_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
     Feedback     Feedback[]
-    Message      Message[]
     Mission      Mission[]
     Recognition  Recognition[]
 
@@ -101,19 +100,6 @@ model Feedback {
     @@index([event_id, from_user_id, to_user_id])
     @@index([from_user_id])
     @@index([to_user_id])
-}
-
-model Message {
-    id         Int       @id @default(autoincrement())
-    event_id   Int
-    content    String    @db.MediumText
-    sender_id  String
-    created_at DateTime  @db.DateTime(0)
-    updated_at DateTime? @db.DateTime(0)
-    Event      Event     @relation(fields: [event_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-    @@index([event_id])
-    @@index([sender_id])
 }
 
 model Mission {
