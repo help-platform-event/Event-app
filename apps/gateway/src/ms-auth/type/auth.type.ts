@@ -5,7 +5,7 @@ export interface JwtPayload {
     /** UUID de l'utilisateur dans ms-auth-java. */
     sub: string;
     email: string;
-    role: string;
+    role: Role;
     iat?: number;
     exp?: number;
 }
@@ -15,14 +15,7 @@ export interface SigninResponse {
     refreshToken: string;
 }
 
-/**
- * Structure du payload tel qu'on la retrouve dans la `request.user` après
- * que le `AuthGard` a décodé le token
- */
-export interface AuthUser {
-    id: number;
-}
-
+/** L'utilisateur connecté, tel que l'`AuthGuard` le place dans `request.user`. */
 export interface CurrentUserData {
     id: string;
     email: string;

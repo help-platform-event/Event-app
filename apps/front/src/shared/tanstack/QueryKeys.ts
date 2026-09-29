@@ -3,6 +3,7 @@ import { SettingsList } from '@app/contracts';
 export const queryKeys = {
     events: ['events'] as const,
     event: (id: number) => ['events', id] as const,
+    myEvents: ['events', 'mine'] as const,
 
     missions: ['missions'] as const,
     mission: (id: number) => ['missions', id] as const,

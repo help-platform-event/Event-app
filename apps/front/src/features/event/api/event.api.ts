@@ -1,6 +1,7 @@
 import type { EventFilters } from '../../../shared/components/UI/filter/eventsFilters.interface';
 import { api } from '../../../shared/utils/axios-client';
 import {
+    EventApiResponse,
     EventCreationFormValues,
     EventDto,
     EventWithAddress,
@@ -15,6 +16,12 @@ export async function getEvents(filters?: EventFilters) {
         paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
     });
 
+    return data;
+}
+
+/** Tous les évènements de l'organisateur connecté, sans pagination. */
+export async function getMyEvents() {
+    const { data } = await api.get<EventApiResponse[]>(`/events/my-events`);
     return data;
 }
 

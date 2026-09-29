@@ -1,11 +1,19 @@
 import {
+    keepPreviousData,
     useMutation,
     useQuery,
     useQueryClient,
     type UseMutationResult,
     type UseQueryResult,
 } from '@tanstack/react-query';
-import { createEvent, deleteEvent, getEventById, getEvents, updateEvent } from '../api/event.api';
+import {
+    createEvent,
+    deleteEvent,
+    getEventById,
+    getEvents,
+    getMyEvents,
+    updateEvent,
+} from '../api/event.api';
 import type { EventFilters } from '../../../shared/components/UI/filter/eventsFilters.interface';
 import { EventMapper } from '../mapper/EventMapper';
 import {
@@ -30,6 +38,16 @@ export function useGetEvents(filters?: EventFilters): UseQueryResult<PaginatedEv
                 limit: res.limit,
             };
         },
+        // Garde la page affichée pendant le chargement de la suivante (pas de clignotement).
+        placeholderData: keepPreviousData,
+    });
+}
+
+/** Les évènements de l'organisateur connecté (page « Mes évènements »). */
+export function useGetMyEvents(): UseQueryResult<EventWithAddress[], Error> {
+    return useQuery({
+        queryKey: queryKeys.myEvents,
+        queryFn: async () => (await getMyEvents()).map((e) => EventMapper.toEvent(e)),
     });
 }
 

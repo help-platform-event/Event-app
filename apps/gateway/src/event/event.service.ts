@@ -216,6 +216,18 @@ export class EventService {
             });
         }
 
+        // Recherche texte : titre OU description. MySQL compare sans tenir compte de la casse
+        // (collation par défaut), donc un simple `contains` suffit.
+        const search = filters?.search?.trim();
+        if (search) {
+            andConditions.push({
+                OR: [
+                    { title: { contains: search } },
+                    { description: { contains: search } },
+                ],
+            });
+        }
+
         // WHERE PRINCIPAL (SQL) :
         const where: Prisma.EventWhereInput = {
             // Filtre statut (par défaut : exclut CANCELLED)
@@ -310,9 +322,9 @@ export class EventService {
                 // skip / take → pagination SQL (performante)
                 skip,
                 take: limit,
-                orderBy: {
-                    start_date: 'asc', // garantit une pagination stable (évite doublons / trous)
-                },
+                // L'id départage les évènements qui commencent au même moment : sans lui, MySQL
+                // peut les renvoyer dans un ordre différent d'une page à l'autre (doublons / trous).
+                orderBy: [{ start_date: 'asc' }, { id: 'asc' }],
                 ...eventWithAddressQuery,
             }),
             // count → total des résultats (pour pagination front)

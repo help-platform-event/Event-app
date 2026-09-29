@@ -1,5 +1,5 @@
 // Voir src/docs/create-map-geoapify.md, surtout les étapes 5.1 a 5.4 et 9.1 a 9.4, pour l'explication detaillee de cette integration carte/Geoapify.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGetEvents } from '../features/event/hooks/use_event.service';
 import type { EventFilters } from '../shared/components/UI/filter/eventsFilters.interface';
@@ -13,10 +13,15 @@ import { useProfile } from '@/features/settings/hooks/use-profile';
 import { Container } from '@/components/layout/container';
 import { Section } from '@/components/layout/section';
 import { useUserMapOrigin } from '@/shared/components/UI/map/useUserMapOrigin';
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+
+/** Délai après la dernière frappe avant de relancer la recherche (une requête par mot, pas par lettre). */
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function Home() {
     // État local des filtres, de l'affichage carte et de la pagination.
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
     const [location, setLocation] = useState<LocationState>({
         city: '',
         distanceKm: 0,
@@ -67,40 +72,39 @@ export default function Home() {
             latitude: hasRadiusFilter ? effectiveOrigin?.lat : undefined,
             longitude: hasRadiusFilter ? effectiveOrigin?.lon : undefined,
             distanceKm: hasRadiusFilter ? location.distanceKm : undefined,
+            search: debouncedSearch || undefined,
             page: currentPage,
             limit: pageSize,
         };
-    }, [filterDateValue, location, currentPage, effectiveOrigin]);
+    }, [filterDateValue, location, currentPage, effectiveOrigin, debouncedSearch]);
 
     const {
         data,
+        isPlaceholderData,
         isLoading: isEventsLoading,
         isError: isEventsError,
         error: eventsError,
     } = useGetEvents(filters);
 
-    const events = data?.items ?? [];
+    // Même tableau tant que la réponse ne change pas (sinon la carte se recalcule à chaque rendu).
+    const events = useMemo(() => data?.items ?? [], [data]);
     const total = data?.total ?? 0;
     const limit = data?.limit ?? pageSize;
-
-    // Recherche texte appliquée côté client sur les évènements déjà chargés (titre/description).
-    // Filtrage sur un tableau : calcul reellement non trivial, useMemo justifie.
-    const searchedEvents = useMemo(() => {
-        const term = search.trim().toLowerCase();
-        if (!term) return events;
-
-        return events.filter((event) => {
-            const title = event.title?.toLowerCase() ?? '';
-            const description = event.description?.toLowerCase() ?? '';
-            return title.includes(term) || description.includes(term);
-        });
-    }, [events, search]);
 
     // Calcul trivial (une division, un arrondi) : pas besoin de useMemo.
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
+    // Si le nombre de pages diminue (évènements fermés entre-temps), on revient sur la dernière
+    // page qui existe au lieu d'afficher une page vide. Pas pendant qu'on affiche encore les
+    // données de la requête précédente (placeholder).
+    useEffect(() => {
+        if (!isPlaceholderData && currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [isPlaceholderData, currentPage, totalPages]);
+
     // Transformation d'un tableau d'events en points de carte : useMemo justifie.
-    const eventMapPoints = useMemo(() => toEventMapPoints(searchedEvents), [searchedEvents]);
+    const eventMapPoints = useMemo(() => toEventMapPoints(events), [events]);
 
     // Messages dérivés affichés dans la carte et la liste.
     // Calculs triviaux (quelques comparaisons de booleens) : pas besoin de useMemo,
@@ -118,7 +122,7 @@ export default function Home() {
         isEventsLoading,
         isEventsError,
         eventsErrorMessage: eventsError?.message,
-        displayedEventsCount: searchedEvents.length,
+        displayedEventsCount: events.length,
         radiusMeters: location.distanceKm * 1000,
         showRadiusEmptyMessage: Boolean(location.distanceKm),
     });
@@ -128,7 +132,10 @@ export default function Home() {
             <Section size={'1'}>
                 <HomeFilters
                     search={search}
-                    onSearchChange={setSearch}
+                    onSearchChange={(value) => {
+                        setCurrentPage(1);
+                        setSearch(value);
+                    }}
                     location={location}
                     onLocationChange={(updater) => {
                         setCurrentPage(1);
@@ -162,7 +169,7 @@ export default function Home() {
             <Section size={'1'}>
                 <HomeEventsList
                     listStatusMessage={listStatusMessage}
-                    events={searchedEvents}
+                    events={events}
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={setCurrentPage}
