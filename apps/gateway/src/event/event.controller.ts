@@ -16,7 +16,12 @@ import { EventFiltersDto } from './dto/event-filters.dto';
 import { PublicUser, User } from '../ms-auth/decorators/user.decorator';
 import { Public } from '../ms-auth/decorators/public.decorator';
 import { AccessToken } from '../ms-auth/decorators/access-token.decorator';
-import { EventDto, EventWithAddress, PaginatedEventsDto } from '@app/contracts';
+import {
+    EventDto,
+    EventMemberDto,
+    EventWithAddress,
+    PaginatedEventsDto,
+} from '@app/contracts';
 
 @Controller('events')
 export class EventController {
@@ -45,6 +50,16 @@ export class EventController {
         @AccessToken() accessToken: string,
     ): Promise<EventWithAddress[]> {
         return await this.eventService.findAllMyEvents(userId, accessToken);
+    }
+
+    /** Organisateur + bénévoles acceptés ; 403 pour qui n'en fait pas partie. */
+    @Get(':id/members')
+    async findMembers(
+        @Param('id', ParseIntPipe) eventId: number,
+        @User('id') userId: string,
+        @AccessToken() accessToken: string,
+    ): Promise<EventMemberDto[]> {
+        return this.eventService.findMembers(eventId, userId, accessToken);
     }
 
     @Public()

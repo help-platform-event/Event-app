@@ -1,3 +1,4 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma, prisma } from '@app/db';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -8,7 +9,8 @@ import { MsAuthClient } from '../ms-auth-client/ms-auth-client.service';
 
 jest.mock('@app/db', () => ({
     prisma: {
-        event: { findMany: jest.fn(), count: jest.fn() },
+        event: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
+        participation: { findMany: jest.fn() },
     },
 }));
 
@@ -63,6 +65,84 @@ describe('EventService.findAll', () => {
         await service.findAll({ search: '   ' });
 
         expect(findManyArgs().where?.AND).toBeUndefined();
+    });
+});
+
+describe('EventService.findMembers', () => {
+    const mockPrisma = prisma as any;
+    const msAuthClient = { getProfiles: jest.fn() };
+    let service: EventService;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        service = new EventService(
+            {} as GeoapifyService,
+            msAuthClient as unknown as MsAuthClient,
+        );
+        mockPrisma.event.findUnique.mockResolvedValue({
+            organizer_id: 'organizer',
+        });
+        // The organizer also accepted on their own slot: still listed once, as the organizer.
+        mockPrisma.participation.findMany.mockResolvedValue([
+            { user_id: 'volunteer' },
+            { user_id: 'organizer' },
+        ]);
+        msAuthClient.getProfiles.mockImplementation(
+            (_: string, ids: string[]) =>
+                Promise.resolve(
+                    ids.map((id) => ({
+                        id,
+                        email: `${id}@example.com`,
+                        first_name: id,
+                        last_name: null,
+                        avatar_url: null,
+                    })),
+                ),
+        );
+    });
+
+    it('lists the organizer then the accepted volunteers, without their emails', async () => {
+        const members = await service.findMembers(7, 'volunteer', 'token');
+
+        expect(members).toEqual([
+            {
+                id: 'organizer',
+                first_name: 'organizer',
+                last_name: null,
+                avatar_url: null,
+                role: 'ORGANIZER',
+            },
+            {
+                id: 'volunteer',
+                first_name: 'volunteer',
+                last_name: null,
+                avatar_url: null,
+                role: 'VOLUNTEER',
+            },
+        ]);
+        expect(mockPrisma.participation.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    status: 'ACCEPTED',
+                    Slot: { Mission: { event_id: 7 } },
+                },
+            }),
+        );
+    });
+
+    it('refuses anyone else (a pending volunteer, a stranger)', async () => {
+        await expect(
+            service.findMembers(7, 'stranger', 'token'),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(msAuthClient.getProfiles).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for an unknown event', async () => {
+        mockPrisma.event.findUnique.mockResolvedValue(null);
+
+        await expect(
+            service.findMembers(404, 'organizer', 'token'),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 });
 

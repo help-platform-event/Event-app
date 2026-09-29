@@ -1,4 +1,5 @@
-# Full dev stack in one command (requires ms-auth-java and ms-notification-java cloned next to this repo):
+# Full dev stack in one command (requires ms-auth-java, ms-notification-java and ms-chat-java cloned
+# next to this repo):
 #   docker compose -f docker-compose.dev.yml --profile app up --build
 # `--profile app` is needed because ms-auth-java keeps its own `app` service behind that profile.
 include:
@@ -6,6 +7,8 @@ include:
     - ../ms-auth-java/compose.yaml
     # ms-notification-java's MySQL (3309), Mailpit (SMTP 1025, UI 8025) and the app (8085).
     - ../ms-notification-java/compose.yaml
+    # ms-chat-java's MySQL (3310) and the app (8086).
+    - ../ms-chat-java/compose.yaml
 
 services:
     # -------------------------
@@ -83,6 +86,8 @@ services:
             MS_AUTH_URL: http://app:8080
             # `notification-app` = ms-notification-java, from the included compose file.
             MS_NOTIFICATION_URL: http://notification-app:8085
+            # `chat-app` = ms-chat-java: the Gateway relays the Front's WebSocket (/chat) to it.
+            MS_CHAT_URL: http://chat-app:8086
             # ms-auth-java's broker, internal listener (see its compose.yaml).
             KAFKA_BROKERS: kafka:29092
             # Must match ms-auth-java's dev JWT_SECRET (see its compose.yaml): the Gateway
@@ -97,6 +102,8 @@ services:
             kafka:
                 condition: service_healthy
             notification-app:
+                condition: service_healthy
+            chat-app:
                 condition: service_healthy
         restart: unless-stopped
 
