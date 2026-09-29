@@ -7,7 +7,13 @@ export default function Footer() {
             <div className="flex flex-col items-center gap-1 text-center">
                 <p className="font-semibold text-sm">Built by Maxime Tavares</p>
 
-                <p className="text-xs opacity-60">Fullstack TypeScript • NestJS • React</p>
+                <p className="text-xs opacity-60">
+                    React • TypeScript • NestJS • Java 21 • Spring Boot
+                </p>
+
+                <p className="text-xs opacity-60">
+                    Kafka • WebSocket (STOMP) • SSE • MySQL • Docker
+                </p>
 
                 <p className="text-[11px] opacity-40">Event management system</p>
             </div>
