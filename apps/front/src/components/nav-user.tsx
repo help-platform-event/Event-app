@@ -18,9 +18,19 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import { useSignout } from '@/features/auth/hooks/use_auth.service';
-import { ChevronsUpDownIcon, BadgeCheckIcon, BellIcon, LogOutIcon, Moon, Sun } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { ChevronsUpDownIcon, BellIcon, LogOutIcon, Moon, Sun, UserIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
 import { useTheme } from './theme-provider';
+
+/** « Marie Dupont » → « MD » ; sans nom, la première lettre de l'email. */
+function initialsOf(name: string, email: string): string {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return email.charAt(0).toUpperCase() || '?';
+    return words
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join('');
+}
 
 export function NavUser({
     user,
@@ -38,6 +48,10 @@ export function NavUser({
 
     const signoutMutation = useSignout();
 
+    // Sans prénom renseigné dans le profil, on affiche l'email à la place du nom.
+    const displayName = user.name.trim() || user.email;
+    const initials = initialsOf(user.name, user.email);
+
     const handleSignout = async () => {
         await signoutMutation.mutateAsync();
         await navigate('/');
@@ -53,11 +67,11 @@ export function NavUser({
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <Avatar className="h-8 w-8 rounded-lg">
-                                <AvatarImage src={user.avatar} alt={user.name} />
-                                <AvatarFallback className="rounded-lg">N.A</AvatarFallback>
+                                <AvatarImage src={user.avatar} alt={displayName} />
+                                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate font-medium">{user.name}</span>
+                                <span className="truncate font-medium">{displayName}</span>
                                 <span className="truncate text-xs">{user.email}</span>
                             </div>
                             <ChevronsUpDownIcon className="ml-auto size-4" />
@@ -72,11 +86,13 @@ export function NavUser({
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                 <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage src={user.avatar} alt={user.name} />
-                                    <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                                    <AvatarImage src={user.avatar} alt={displayName} />
+                                    <AvatarFallback className="rounded-lg">
+                                        {initials}
+                                    </AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-medium">{user.name}</span>
+                                    <span className="truncate font-medium">{displayName}</span>
                                     <span className="truncate text-xs">{user.email}</span>
                                 </div>
                             </div>
@@ -84,13 +100,17 @@ export function NavUser({
 
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                <BadgeCheckIcon />
-                                Account (WIP)
+                            <DropdownMenuItem asChild>
+                                <Link to="/settings/profil">
+                                    <UserIcon />
+                                    Mon profil
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <BellIcon />
-                                Notifications (WIP)
+                            <DropdownMenuItem asChild>
+                                <Link to="/settings/notifications">
+                                    <BellIcon />
+                                    Préférences de notification
+                                </Link>
                             </DropdownMenuItem>
 
                             <DropdownMenuSub>
@@ -115,7 +135,7 @@ export function NavUser({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleSignout}>
                             <LogOutIcon />
-                            Log out
+                            Se déconnecter
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

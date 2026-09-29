@@ -15,12 +15,14 @@ import {
 import {
     useMarkAllRead,
     useMarkRead,
+    useNotificationStream,
     useNotifications,
     useUnreadCount,
 } from '../hooks/use-notifications';
 
-/** Header bell: unread badge (polled every 30 s) and the latest notifications in a menu. */
+/** Header bell: unread badge (kept live by the SSE stream) and the latest notifications in a menu. */
 export function NotificationBell() {
+    useNotificationStream();
     const [open, setOpen] = useState(false);
     const { data: unread, refetch: refetchUnreadCount } = useUnreadCount();
     const { data: notifications, isLoading } = useNotifications(open);

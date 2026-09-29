@@ -20,6 +20,18 @@ export class MsNotificationClient {
         });
     }
 
+    /** Le flux SSE des nouvelles notifications de l'utilisateur. */
+    stream(
+        accessToken: string,
+        signal: AbortSignal,
+    ): Promise<ReadableStream<Uint8Array>> {
+        return this.http.openStream(
+            '/api/notifications/stream',
+            accessToken,
+            signal,
+        );
+    }
+
     unreadCount(accessToken: string): Promise<UnreadCountDto> {
         return this.http.request('GET', '/api/notifications/unread-count', {
             accessToken,
