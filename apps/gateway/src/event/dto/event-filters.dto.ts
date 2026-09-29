@@ -1,6 +1,17 @@
 import { EventStatus } from '@app/contracts';
 import { Transform, Type } from 'class-transformer';
-import { IsOptional, IsArray, IsString, IsNumber } from 'class-validator';
+import {
+    IsOptional,
+    IsArray,
+    IsString,
+    IsInt,
+    Min,
+    Max,
+    MaxLength,
+} from 'class-validator';
+
+/** Plafond de `limit` : une page ne peut pas ramener toute la table. */
+export const MAX_EVENTS_PAGE_SIZE = 50;
 
 export class EventFiltersDto {
     @IsOptional()
@@ -15,6 +26,12 @@ export class EventFiltersDto {
     @IsString()
     city?: string;
 
+    /** Recherche texte dans le titre et la description (insensible à la casse, via la collation MySQL). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    search?: string;
+
     @IsOptional()
     startDate?: string;
 
@@ -23,12 +40,15 @@ export class EventFiltersDto {
 
     @IsOptional()
     @Type(() => Number)
-    @IsNumber()
+    @IsInt()
+    @Min(1)
+    @Max(MAX_EVENTS_PAGE_SIZE)
     limit?: number;
 
     @IsOptional()
     @Type(() => Number)
-    @IsNumber()
+    @IsInt()
+    @Min(1)
     page?: number;
 
     @IsOptional()
