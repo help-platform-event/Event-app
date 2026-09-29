@@ -31,7 +31,7 @@ Monorepo (pnpm + Turborepo):
 ## The Front
 
 - "Mes missions" (`/me/missions`): the user's participations grouped by event, with the slot and the status; a pending or accepted participation can be cancelled (after a confirmation).
-- The event discussion (`features/chat`, the "Discussion" tab of an event, for its members): a STOMP client (`@stomp/stompjs`) through the Gateway. The access token goes in the CONNECT frame (refreshed first if it's about to expire); the latest 50 messages load on opening and new ones appear live. Sending is disabled while reconnecting (the server closes the connection when the token expires).
+- The event discussion (`features/chat`, the "Discussion" tab of an event, for its members): a STOMP client (`@stomp/stompjs`) through the Gateway. The access token goes in the CONNECT frame (refreshed first if it's about to expire); the latest 50 messages load on opening and new ones appear live, as chat bubbles (mine on the right). A line shows who is typing (a signal sent at most every 2 s, hidden after 4 s of silence). Sending is disabled while reconnecting (the server closes the connection when the token expires).
 - The notification bell (`features/notification`), in the logged-in layout's header: new notifications are **pushed** over Server-Sent Events (`useNotificationStream`, with `@microsoft/fetch-event-source` because the browser's `EventSource` can't send the `Authorization` header). The badge updates instantly, the stream pauses while the tab is hidden, and each reconnection reloads the unread count. The menu lists the latest notifications.
 
 ## Develop

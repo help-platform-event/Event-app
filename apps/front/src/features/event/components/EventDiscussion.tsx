@@ -27,6 +27,14 @@ function formatSentAt(sentAt: string): string {
     return format(date, isToday(date) ? 'HH:mm' : 'dd/MM HH:mm');
 }
 
+/** « Victor est en train d'écrire… », « Victor et Olivia écrivent… », « Plusieurs personnes… ». */
+function typingLabel(names: string[]): string {
+    if (names.length === 0) return '';
+    if (names.length === 1) return `${names[0]} est en train d'écrire…`;
+    if (names.length === 2) return `${names[0]} et ${names[1]} écrivent…`;
+    return 'Plusieurs personnes écrivent…';
+}
+
 function displayName(member: EventMemberDto | undefined): string {
     if (!member) return 'Ancien membre';
     const name = [member.first_name, member.last_name].filter(Boolean).join(' ');
@@ -39,7 +47,7 @@ function displayName(member: EventMemberDto | undefined): string {
  * avatar and name. Enter sends, Shift+Enter adds a line.
  */
 export function EventDiscussion({ eventId }: Readonly<{ eventId: number }>) {
-    const { messages, status, error, send } = useEventChat(eventId);
+    const { messages, status, error, typingUserIds, send, notifyTyping } = useEventChat(eventId);
     const { data: members } = useEventMembers(eventId);
     const { data: me } = useMe();
     const [draft, setDraft] = useState('');
@@ -49,6 +57,10 @@ export function EventDiscussion({ eventId }: Readonly<{ eventId: number }>) {
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ block: 'end' });
     }, [messages.length]);
+
+    const typingNames = typingUserIds
+        .filter((id) => id !== me?.id)
+        .map((id) => members?.find((member) => member.id === id)?.first_name || "Quelqu'un");
 
     const connected = status === 'connected';
     const canSend = connected && draft.trim().length > 0;
@@ -141,10 +153,18 @@ export function EventDiscussion({ eventId }: Readonly<{ eventId: number }>) {
                 <div ref={bottomRef} />
             </div>
 
+            {/* Fixed height: the input doesn't jump when the line appears. */}
+            <p className="h-4 text-xs text-muted-foreground italic" aria-live="polite">
+                {typingLabel(typingNames)}
+            </p>
+
             <div className="flex items-end gap-2">
                 <Textarea
                     value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
+                    onChange={(event) => {
+                        setDraft(event.target.value);
+                        if (event.target.value.trim()) notifyTyping();
+                    }}
                     onKeyDown={handleKeyDown}
                     maxLength={CHAT_MESSAGE_MAX_LENGTH}
                     placeholder="Écrire un message…"
