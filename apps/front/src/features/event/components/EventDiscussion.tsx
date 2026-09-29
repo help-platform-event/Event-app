@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { format, isToday } from 'date-fns';
 import type { EventMemberDto } from '@app/contracts';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -11,12 +10,22 @@ import { useEventChat, type ChatStatus } from '@/features/chat/hooks/use-event-c
 import { useEventMembers } from '@/features/chat/hooks/use-event-members';
 import { CHAT_MESSAGE_MAX_LENGTH } from '@/features/chat/types/chat.types';
 import { initialsOf } from '@/shared/utils/initials';
+import { cn } from '@/lib/utils';
 
 const STATUS_LABEL: Record<ChatStatus, string> = {
     connecting: 'Connexion…',
     connected: 'En ligne',
     offline: 'Hors ligne, reconnexion…',
 };
+
+/** Consecutive messages of one person closer than this are grouped under one avatar and name. */
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+/** « 14:32 » today, « 28/09 14:32 » before (a fixed time: « 3 minutes ago » would go stale). */
+function formatSentAt(sentAt: string): string {
+    const date = new Date(sentAt);
+    return format(date, isToday(date) ? 'HH:mm' : 'dd/MM HH:mm');
+}
 
 function displayName(member: EventMemberDto | undefined): string {
     if (!member) return 'Ancien membre';
@@ -26,7 +35,8 @@ function displayName(member: EventMemberDto | undefined): string {
 
 /**
  * The event's discussion (organizer + accepted volunteers): live messages over WebSocket, the
- * latest 50 on opening. Enter sends, Shift+Enter adds a line.
+ * latest 50 on opening. Chat bubbles: mine on the right, the others' on the left with their
+ * avatar and name. Enter sends, Shift+Enter adds a line.
  */
 export function EventDiscussion({ eventId }: Readonly<{ eventId: number }>) {
     const { messages, status, error, send } = useEventChat(eventId);
@@ -59,43 +69,71 @@ export function EventDiscussion({ eventId }: Readonly<{ eventId: number }>) {
             <p className="text-xs text-muted-foreground">{STATUS_LABEL[status]}</p>
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            <div className="flex max-h-[60vh] min-h-48 flex-col gap-3 overflow-y-auto rounded-lg border p-3">
+            <div className="flex max-h-[60vh] min-h-48 flex-col overflow-y-auto rounded-lg border p-3">
                 {messages.length === 0 && (
                     <p className="m-auto text-sm text-muted-foreground">
                         Aucun message pour l'instant. Lance la discussion !
                     </p>
                 )}
-                {messages.map((message) => {
+                {messages.map((message, index) => {
                     const author = members?.find((member) => member.id === message.senderId);
                     const name = displayName(author);
                     const mine = message.senderId === me?.id;
+                    const previous = messages[index - 1];
+                    // Messages sent in a row by the same person show their avatar and name once.
+                    const grouped =
+                        previous?.senderId === message.senderId &&
+                        Date.parse(message.sentAt) - Date.parse(previous.sentAt) < GROUP_GAP_MS;
                     return (
                         <div
                             key={message.id}
-                            className={`flex gap-2 rounded-md p-2 ${mine ? 'bg-muted' : ''}`}
+                            className={cn(
+                                'flex gap-2',
+                                mine ? 'justify-end' : 'justify-start',
+                                grouped ? 'mt-1' : 'mt-3 first:mt-0',
+                            )}
                         >
-                            <Avatar className="h-8 w-8 rounded-lg">
-                                <AvatarImage src={author?.avatar_url ?? undefined} alt={name} />
-                                <AvatarFallback className="rounded-lg">
-                                    {initialsOf(author ? name : '')}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="flex min-w-0 flex-col gap-0.5">
-                                <div className="flex flex-wrap items-center gap-2 text-sm">
-                                    <span className="font-medium">{mine ? 'Moi' : name}</span>
-                                    {author?.role === 'ORGANIZER' && (
-                                        <Badge variant="secondary">Organisateur</Badge>
+                            {!mine &&
+                                (grouped ? (
+                                    <div className="w-8 shrink-0" />
+                                ) : (
+                                    <Avatar className="h-8 w-8 shrink-0 rounded-lg">
+                                        <AvatarImage
+                                            src={author?.avatar_url ?? undefined}
+                                            alt={name}
+                                        />
+                                        <AvatarFallback className="rounded-lg">
+                                            {initialsOf(author ? name : '')}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                ))}
+                            <div
+                                className={cn(
+                                    'flex max-w-[75%] flex-col',
+                                    mine ? 'items-end' : 'items-start',
+                                )}
+                            >
+                                {!mine && !grouped && (
+                                    <div className="mb-1 flex items-center gap-2 text-xs">
+                                        <span className="font-medium">{name}</span>
+                                        {author?.role === 'ORGANIZER' && (
+                                            <Badge variant="secondary">Organisateur</Badge>
+                                        )}
+                                    </div>
+                                )}
+                                <p
+                                    className={cn(
+                                        'rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap',
+                                        mine
+                                            ? 'rounded-br-sm bg-primary text-primary-foreground'
+                                            : 'rounded-bl-sm bg-muted',
                                     )}
-                                    <span className="text-xs text-muted-foreground">
-                                        {formatDistanceToNow(new Date(message.sentAt), {
-                                            addSuffix: true,
-                                            locale: fr,
-                                        })}
-                                    </span>
-                                </div>
-                                <p className="text-sm break-words whitespace-pre-wrap">
+                                >
                                     {message.content}
                                 </p>
+                                <span className="mt-0.5 text-[11px] text-muted-foreground">
+                                    {formatSentAt(message.sentAt)}
+                                </span>
                             </div>
                         </div>
                     );
