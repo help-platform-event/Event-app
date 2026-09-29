@@ -62,6 +62,42 @@ describe('MsNotificationClient', () => {
         });
     });
 
+    it('opens the event stream with the bearer and the caller abort signal', async () => {
+        const body = new ReadableStream<Uint8Array>();
+        fetchMock.mockResolvedValue(
+            new Response(body, {
+                status: 200,
+                headers: { 'Content-Type': 'text/event-stream' },
+            }),
+        );
+        const abort = new AbortController();
+
+        const stream = await client.stream('access', abort.signal);
+
+        expect(stream).toBe(body);
+        const [url, init] = fetchMock.mock.calls[0];
+        expect(url).toBe(
+            'http://notification-app:8085/api/notifications/stream',
+        );
+        expect(init.headers).toEqual({
+            Accept: 'text/event-stream',
+            Authorization: 'Bearer access',
+        });
+        expect(init.signal).toBe(abort.signal);
+    });
+
+    it('turns a refused stream into an HttpException', async () => {
+        fetchMock.mockResolvedValue(
+            jsonResponse(401, { error: 'Unauthorized', status: 401 }),
+        );
+
+        const error = await client
+            .stream('expired', new AbortController().signal)
+            .catch((e: unknown) => e);
+
+        expect((error as HttpException).getStatus()).toBe(401);
+    });
+
     it('returns 503 when ms-notification is unreachable', async () => {
         fetchMock.mockRejectedValue(new TypeError('fetch failed'));
 

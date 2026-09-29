@@ -6,13 +6,36 @@ type RetryAxiosRequest = InternalAxiosRequestConfig & {
     _retry?: boolean;
 };
 
+let refreshPromise: Promise<string> | null = null;
+
+/**
+ * Obtient un nouvel access token via le cookie de refresh et le range dans le store. Les appels
+ * simultanés partagent la même requête. Échec (session expirée) : déconnexion et retour à la page
+ * de connexion. Utilisée par l'intercepteur ci-dessous et par le flux SSE des notifications.
+ */
+export function refreshAccessToken(): Promise<string> {
+    refreshPromise ??= AuthApi.refresh()
+        .then((data) => {
+            useAuthStore.getState().setAccessToken(data.accessToken);
+            return data.accessToken;
+        })
+        .catch((err) => {
+            useAuthStore.getState().clearAuth();
+            globalThis.location.href = '/auth/signin';
+            throw err;
+        })
+        .finally(() => {
+            refreshPromise = null;
+        });
+
+    return refreshPromise;
+}
+
 function axiosClient(): AxiosInstance {
     const api = axios.create({
         baseURL: `${import.meta.env.VITE_API_URL}/`,
         withCredentials: true,
     });
-
-    let refreshPromise: Promise<string> | null = null;
 
     const isAuthRoute = (url?: string): boolean => {
         return typeof url === 'string' && url.includes('/auth/');
@@ -76,21 +99,7 @@ function axiosClient(): AxiosInstance {
             if (error.response?.status === 401 && !request._retry) {
                 request._retry = true;
 
-                refreshPromise ??= AuthApi.refresh()
-                    .then((data) => {
-                        useAuthStore.getState().setAccessToken(data.accessToken);
-                        return data.accessToken;
-                    })
-                    .catch((err) => {
-                        useAuthStore.getState().clearAuth();
-                        globalThis.location.href = '/auth/signin';
-                        throw err;
-                    })
-                    .finally(() => {
-                        refreshPromise = null;
-                    });
-
-                const newAccessToken = await refreshPromise;
+                const newAccessToken = await refreshAccessToken();
 
                 request.headers = request.headers ?? {};
                 request.headers.Authorization = `Bearer ${newAccessToken}`;

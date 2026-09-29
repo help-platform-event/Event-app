@@ -61,21 +61,10 @@ export class ServiceHttpClient {
         if (body !== undefined) headers['Content-Type'] = 'application/json';
         if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-        let response: Response;
-        try {
-            response = await fetch(`${this.baseUrl}${path}`, {
-                method,
-                headers,
-                body: body === undefined ? undefined : JSON.stringify(body),
-            });
-        } catch (error) {
-            this.logger.error(
-                `${this.serviceName} injoignable (${method} ${path})`,
-                error instanceof Error ? error.message : error,
-            );
-            throw new ServiceUnavailableException(this.unavailableMessage);
-        }
-
+        const response = await this.send(method, path, {
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+        });
         const text = await response.text();
 
         if (!response.ok) {
@@ -83,6 +72,43 @@ export class ServiceHttpClient {
         }
 
         return (text ? JSON.parse(text) : undefined) as T;
+    }
+
+    /**
+     * Ouvre un flux Server-Sent Events et renvoie son corps, à relayer tel quel au Front. Les
+     * erreurs avant l'ouverture (401, service injoignable…) sont traduites comme pour `request`.
+     * Abandonner `signal` ferme la connexion vers le service.
+     */
+    async openStream(
+        path: string,
+        accessToken: string | undefined,
+        signal: AbortSignal,
+    ): Promise<ReadableStream<Uint8Array>> {
+        const headers: Record<string, string> = { Accept: 'text/event-stream' };
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+        const response = await this.send('GET', path, { headers, signal });
+
+        if (!response.ok || !response.body) {
+            throw toHttpException(response, await response.text());
+        }
+        return response.body;
+    }
+
+    private async send(
+        method: HttpMethod,
+        path: string,
+        init: RequestInit,
+    ): Promise<Response> {
+        try {
+            return await fetch(`${this.baseUrl}${path}`, { ...init, method });
+        } catch (error) {
+            this.logger.error(
+                `${this.serviceName} injoignable (${method} ${path})`,
+                error instanceof Error ? error.message : error,
+            );
+            throw new ServiceUnavailableException(this.unavailableMessage);
+        }
     }
 }
 
