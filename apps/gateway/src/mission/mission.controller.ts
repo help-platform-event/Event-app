@@ -41,11 +41,6 @@ export class MissionController {
         return this.missionService.create(eventId, createMissionDto);
     }
 
-    @Get('missions')
-    findAll() {
-        return this.missionService.findAll();
-    }
-
     @Get('missions/:id')
     async findOneById(
         @User('id') userId: string,

@@ -115,6 +115,8 @@ export class AuthController {
         };
     }
 
+    /** Public : sans access token, on doit quand même pouvoir effacer le cookie de refresh. */
+    @Public()
     @Post('signout')
     async signout(
         @AccessToken() accessToken: string,

@@ -1,22 +1,13 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Param,
-    ParseIntPipe,
-    UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, ParseIntPipe } from '@nestjs/common';
 import { ParticipationService } from './participation.service';
 import { User } from '../ms-auth/decorators/user.decorator';
 import { MyParticipationDto, ParticipantDto } from '@app/contracts';
-import { AuthenticatedGuard } from '../ms-auth/guard/authenticated.guard';
 
 /**
  * Participations. Every route acts for the logged-in user (register, answer a request, cancel,
  * list their own participations): anonymous requests get a 401.
  */
 @Controller()
-@UseGuards(AuthenticatedGuard)
 export class ParticipationController {
     constructor(private readonly participationService: ParticipationService) {}
 

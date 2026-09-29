@@ -9,11 +9,9 @@ import {
     Patch,
     Post,
     Query,
-    UseGuards,
 } from '@nestjs/common';
 import type { NotificationDto, UnreadCountDto } from '@app/contracts';
 import { AccessToken } from '../ms-auth/decorators/access-token.decorator';
-import { AuthenticatedGuard } from '../ms-auth/guard/authenticated.guard';
 import { MsNotificationClient } from './ms-notification.client';
 
 /**
@@ -21,7 +19,6 @@ import { MsNotificationClient } from './ms-notification.client';
  * connectés ; ms-notification-java revérifie le token de son côté.
  */
 @Controller('notifications')
-@UseGuards(AuthenticatedGuard)
 export class NotificationController {
     constructor(private readonly msNotificationClient: MsNotificationClient) {}
 

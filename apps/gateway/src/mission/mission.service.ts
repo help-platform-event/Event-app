@@ -28,14 +28,6 @@ export class MissionService {
         return toMissionDto(newMission);
     }
 
-    async findAll(): Promise<MissionDto[]> {
-        const missions = await prisma.mission.findMany({
-            ...missionQuery,
-        });
-
-        return missions.map((mission) => toMissionDto(mission));
-    }
-
     async findOneById(id: number): Promise<MissionDto> {
         const mission = await prisma.mission.findUnique({
             where: { id },

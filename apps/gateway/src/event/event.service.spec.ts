@@ -87,6 +87,36 @@ describe('EventFiltersDto', () => {
         expect(errorsFor({ [property]: value })).toEqual([property]);
     });
 
+    it('accepts the full query the home page builds', () => {
+        expect(
+            errorsFor({
+                statuses: 'OPEN',
+                startDate: '2026-10-01',
+                endDate: '2026-10-31',
+                city: 'Paris',
+                latitude: '48.85',
+                longitude: '2.35',
+                distanceKm: '25',
+                search: 'concert',
+                page: '1',
+                limit: '12',
+            }),
+        ).toEqual([]);
+    });
+
+    it.each([
+        ['statuses', 'FOO'],
+        ['startDate', 'pasunedate'],
+        ['endDate', '2026-13-45'],
+        ['latitude', 'abc'],
+        ['latitude', '91'],
+        ['longitude', '-181'],
+        ['distanceKm', '-5'],
+        ['distanceKm', '500'],
+    ])('rejects %s=%s', (property, value) => {
+        expect(errorsFor({ [property]: value })).toEqual([property]);
+    });
+
     it('rejects a search longer than 100 characters', () => {
         expect(errorsFor({ search: 'a'.repeat(101) })).toEqual(['search']);
     });

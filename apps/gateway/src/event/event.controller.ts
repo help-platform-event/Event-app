@@ -8,7 +8,6 @@ import {
     Delete,
     ParseIntPipe,
     Query,
-    UseGuards,
 } from '@nestjs/common';
 import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -17,7 +16,6 @@ import { EventFiltersDto } from './dto/event-filters.dto';
 import { PublicUser, User } from '../ms-auth/decorators/user.decorator';
 import { Public } from '../ms-auth/decorators/public.decorator';
 import { AccessToken } from '../ms-auth/decorators/access-token.decorator';
-import { AuthenticatedGuard } from '../ms-auth/guard/authenticated.guard';
 import { EventDto, EventWithAddress, PaginatedEventsDto } from '@app/contracts';
 
 @Controller('events')
@@ -41,9 +39,7 @@ export class EventController {
         return this.eventService.findAll(filters);
     }
 
-    /** Sans ce guard, un visiteur sans token ferait planter `@User('id')` (500 au lieu de 401). */
     @Get('my-events')
-    @UseGuards(AuthenticatedGuard)
     async findMyAll(
         @User('id') userId: string,
         @AccessToken() accessToken: string,
