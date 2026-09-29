@@ -27,7 +27,7 @@ export default function Footer() {
                     <LinkedinIcon size={28} />
                 </a>
                 <a
-                    href="https://github.com/MaximeTavares/Event-app"
+                    href="https://github.com/help-platform-event"
                     className="mt-2 hover:opacity-70 transition"
                 >
                     <GithubIcon size={28} />
