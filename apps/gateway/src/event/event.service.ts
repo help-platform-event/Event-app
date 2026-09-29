@@ -484,20 +484,9 @@ export class EventService {
     }
 
     /**
-     *  Dans la méthode `remove`, deux opérations d'écriture doivent être exécutées ensemble :
-     *
-     *      1. supprimer les notifications liées à l'événement ;
-     *      2. supprimer l'évènement lui-même.
-     *
-     *  `$transaction` permet d'exécuter ces opérations de manière simultané :
-     *      Soit toutes les suppressions sont validées.
-     *      Soit aucune n'est conservée.
-     *
-     *  Si une seule des deux opérations réussit, la base peut se retrouver dans un état incohérent.
-     *
-     *  Pour résumer :
-     *      La transaction est utile car la suppression réelle repose sur plusieurs opérations dépendantes.
-     *      Sans la transaction, une panne ou une erreur entre les deux étapes pourrait laisser la BDD dans un état partiellement modifié.
+     * Supprime un événement de l'organisateur. Ses missions, créneaux, participations et messages
+     * suivent par cascade (clés étrangères `onDelete: Cascade`). Les notifications in-app qui le
+     * concernent vivent dans ms-notification-java et restent en place (accepté en v1).
      */
     async remove(id: number, userId: string): Promise<void> {
         await this.findOwnedEventOrFail(id, userId);
@@ -509,17 +498,6 @@ export class EventService {
 
         if (!event) throw new NotFoundException('Event Not found');
 
-        await prisma.$transaction(async (transaction) => {
-            await transaction.notification.deleteMany({
-                where: {
-                    reference_id: id,
-                    type: 'EVENT',
-                },
-            });
-
-            await transaction.event.delete({
-                where: { id },
-            });
-        });
+        await prisma.event.delete({ where: { id } });
     }
 }

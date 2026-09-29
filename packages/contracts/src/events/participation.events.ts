@@ -27,3 +27,11 @@ export type ParticipationRequestedEvent = ParticipationEventBase;
 export interface ParticipationDecidedEvent extends ParticipationEventBase {
 	status: Extract<ParticipationStatus, "ACCEPTED" | "REJECTED">;
 }
+
+/**
+ * A participation was cancelled, by the volunteer or by the organizer: the other party is
+ * notified (the organizer if the volunteer cancelled, the volunteer if the organizer did).
+ */
+export interface ParticipationCancelledEvent extends ParticipationEventBase {
+	cancelledBy: "PARTICIPANT" | "ORGANIZER";
+}

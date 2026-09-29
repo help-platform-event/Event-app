@@ -33,3 +33,12 @@ export interface ParticipantDetailsDto extends ParticipantDto {
 	last_name: string | null;
 	avatar_url: string | null;
 }
+
+/** One of the logged-in user's participations, with what the "Mes missions" page shows. */
+export interface MyParticipationDto {
+	id: number;
+	status: ParticipationStatus;
+	slot: { id: number; startAt: string; endAt: string };
+	mission: { id: number; title: string };
+	event: { id: number; title: string; startDate: string };
+}

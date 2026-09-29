@@ -15,6 +15,10 @@ export const useParticipateMutation = (slotId: number, eventId: number, missionI
             });
 
             await queryClient.invalidateQueries({
+                queryKey: queryKeys.myParticipations,
+            });
+
+            await queryClient.invalidateQueries({
                 queryKey: queryKeys.event(eventId),
             });
 
@@ -57,6 +61,9 @@ export function useParticipationUpdate(
                 }),
                 queryClient.invalidateQueries({
                     queryKey: queryKeys.event(eventId),
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.myParticipations,
                 }),
             ]);
         },

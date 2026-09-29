@@ -24,10 +24,14 @@ function assertOrganizer(
         throw new ForbiddenException('Only organizer can accept or reject');
 }
 
-function assertOwner(userId: string, p: ParticipationWithStatusAndOrganizer) {
-    if (userId !== p.userId)
+/** Le bénévole peut annuler sa propre inscription, et l'organisateur retirer un bénévole. */
+function assertOwnerOrOrganizer(
+    userId: string,
+    p: ParticipationWithStatusAndOrganizer,
+) {
+    if (userId !== p.userId && userId !== p.event.organizerId)
         throw new ForbiddenException(
-            'You can only cancel your own participations',
+            'Only the participant or the organizer can cancel',
         );
 }
 
@@ -73,7 +77,7 @@ export const PARTICIPATION_TRANSITIONS: Record<
         toStatus: 'CANCELLED',
         fromStatuses: ['PENDING', 'ACCEPTED'],
         guard: (userId, p) => {
-            assertOwner(userId, p);
+            assertOwnerOrOrganizer(userId, p);
             assertFromStatus(
                 p,
                 ['PENDING', 'ACCEPTED'],

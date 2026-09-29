@@ -14,6 +14,10 @@ export const queryKeys = {
     setting: (setting: SettingsList) => ['settings', setting] as const,
 
     participationsBySlot: (slotId: number) => ['participations', 'slot', slotId] as const,
+    myParticipations: ['participations', 'me'] as const,
 
     me: ['me'] as const,
+
+    notifications: ['notifications'] as const,
+    notificationsUnreadCount: ['notifications', 'unread-count'] as const,
 };

@@ -122,7 +122,16 @@ export class SlotService {
 
         if (!slot) throw new NotFoundException('Slot not found');
 
-        const userIds = [...new Set(slot.Participation.map((p) => p.user_id))];
+        // Les demandes en attente et les emails ne regardent que l'organisateur : les autres
+        // utilisateurs ne voient que qui participe (acceptés), sans email.
+        const isOrganizer = slot.Mission.Event.organizer_id === userId;
+        const visibleParticipations = isOrganizer
+            ? slot.Participation
+            : slot.Participation.filter((p) => p.status === 'ACCEPTED');
+
+        const userIds = [
+            ...new Set(visibleParticipations.map((p) => p.user_id)),
+        ];
 
         const participantsProfiles = await this.msAuthClient.getProfiles(
             accessToken,
@@ -133,7 +142,7 @@ export class SlotService {
             participantsProfiles.map((profile) => [profile.id, profile]),
         );
 
-        const participants = slot.Participation.map((participation) => {
+        const participants = visibleParticipations.map((participation) => {
             const profile = profilesMap.get(participation.user_id);
 
             return {
@@ -141,7 +150,7 @@ export class SlotService {
                 id: participation.id,
                 status: participation.status,
                 user_id: participation.user_id,
-                email: profile?.email ?? '',
+                email: isOrganizer ? (profile?.email ?? '') : '',
                 first_name: profile?.first_name ?? null,
                 last_name: profile?.last_name ?? null,
                 avatar_url: profile?.avatar_url ?? null,

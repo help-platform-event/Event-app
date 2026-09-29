@@ -2,6 +2,7 @@ import Home from './pages/Home';
 import { Navigate, Route, Routes } from 'react-router';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import Event from './pages/event/Event';
+import MyMissionsPage from './pages/mission/MyMissionsPage';
 import { EventDetailsPage } from './pages/event/EventDetailsPage';
 import PrivateRoute from './pages/auth/PrivateRoute';
 import UnauthorizedPage from './pages/auth/Unauthorized.page';
@@ -82,6 +83,7 @@ function App() {
                         <Route element={<PrivateRoute allowedRoles={['USER', 'ADMIN']} />}>
                             <Route element={<PrivateLayout />}>
                                 <Route path="/me/events" element={<Event />} />
+                                <Route path="/me/missions" element={<MyMissionsPage />} />
                                 <Route path="/events/create" element={<EventCreationPage />} />
                                 <Route
                                     path="/missions/:missionId"
